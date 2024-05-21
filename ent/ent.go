@@ -12,6 +12,7 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
+	"github.com/karust/openserp/ent/searchquery"
 	"github.com/karust/openserp/ent/serp"
 )
 
@@ -73,7 +74,8 @@ var (
 func checkColumn(table, column string) error {
 	initCheck.Do(func() {
 		columnCheck = sql.NewColumnCheck(map[string]func(string) bool{
-			serp.Table: serp.ValidColumn,
+			serp.Table:        serp.ValidColumn,
+			searchquery.Table: searchquery.ValidColumn,
 		})
 	})
 	return columnCheck(table, column)

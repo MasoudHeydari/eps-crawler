@@ -10,6 +10,7 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
+	"github.com/karust/openserp/core"
 	"github.com/karust/openserp/ent/serp"
 )
 
@@ -24,10 +25,8 @@ type SERP struct {
 	Title string `json:"title,omitempty"`
 	// Description holds the value of the "description" field.
 	Description string `json:"description,omitempty"`
-	// Location holds the value of the "location" field.
-	Location string `json:"location,omitempty"`
 	// ContactInfo holds the value of the "contact_info" field.
-	ContactInfo []string `json:"contact_info,omitempty"`
+	ContactInfo core.ContactInfo `json:"contact_info,omitempty"`
 	// KeyWords holds the value of the "key_words" field.
 	KeyWords []string `json:"key_words,omitempty"`
 	// IsRead holds the value of the "is_read" field.
@@ -48,7 +47,7 @@ func (*SERP) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullBool)
 		case serp.FieldID:
 			values[i] = new(sql.NullInt64)
-		case serp.FieldURL, serp.FieldTitle, serp.FieldDescription, serp.FieldLocation:
+		case serp.FieldURL, serp.FieldTitle, serp.FieldDescription:
 			values[i] = new(sql.NullString)
 		case serp.FieldCreatedAt:
 			values[i] = new(sql.NullTime)
@@ -90,12 +89,6 @@ func (s *SERP) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field description", values[i])
 			} else if value.Valid {
 				s.Description = value.String
-			}
-		case serp.FieldLocation:
-			if value, ok := values[i].(*sql.NullString); !ok {
-				return fmt.Errorf("unexpected type %T for field location", values[i])
-			} else if value.Valid {
-				s.Location = value.String
 			}
 		case serp.FieldContactInfo:
 			if value, ok := values[i].(*[]byte); !ok {
@@ -169,9 +162,6 @@ func (s *SERP) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("description=")
 	builder.WriteString(s.Description)
-	builder.WriteString(", ")
-	builder.WriteString("location=")
-	builder.WriteString(s.Location)
 	builder.WriteString(", ")
 	builder.WriteString("contact_info=")
 	builder.WriteString(fmt.Sprintf("%v", s.ContactInfo))

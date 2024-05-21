@@ -10,6 +10,7 @@ import (
 
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/karust/openserp/core"
 	"github.com/karust/openserp/ent/serp"
 )
 
@@ -38,15 +39,17 @@ func (sc *SERPCreate) SetDescription(s string) *SERPCreate {
 	return sc
 }
 
-// SetLocation sets the "location" field.
-func (sc *SERPCreate) SetLocation(s string) *SERPCreate {
-	sc.mutation.SetLocation(s)
+// SetContactInfo sets the "contact_info" field.
+func (sc *SERPCreate) SetContactInfo(ci core.ContactInfo) *SERPCreate {
+	sc.mutation.SetContactInfo(ci)
 	return sc
 }
 
-// SetContactInfo sets the "contact_info" field.
-func (sc *SERPCreate) SetContactInfo(s []string) *SERPCreate {
-	sc.mutation.SetContactInfo(s)
+// SetNillableContactInfo sets the "contact_info" field if the given value is not nil.
+func (sc *SERPCreate) SetNillableContactInfo(ci *core.ContactInfo) *SERPCreate {
+	if ci != nil {
+		sc.SetContactInfo(*ci)
+	}
 	return sc
 }
 
@@ -150,12 +153,6 @@ func (sc *SERPCreate) check() error {
 	if _, ok := sc.mutation.Description(); !ok {
 		return &ValidationError{Name: "description", err: errors.New(`ent: missing required field "SERP.description"`)}
 	}
-	if _, ok := sc.mutation.Location(); !ok {
-		return &ValidationError{Name: "location", err: errors.New(`ent: missing required field "SERP.location"`)}
-	}
-	if _, ok := sc.mutation.ContactInfo(); !ok {
-		return &ValidationError{Name: "contact_info", err: errors.New(`ent: missing required field "SERP.contact_info"`)}
-	}
 	if _, ok := sc.mutation.KeyWords(); !ok {
 		return &ValidationError{Name: "key_words", err: errors.New(`ent: missing required field "SERP.key_words"`)}
 	}
@@ -202,10 +199,6 @@ func (sc *SERPCreate) createSpec() (*SERP, *sqlgraph.CreateSpec) {
 	if value, ok := sc.mutation.Description(); ok {
 		_spec.SetField(serp.FieldDescription, field.TypeString, value)
 		_node.Description = value
-	}
-	if value, ok := sc.mutation.Location(); ok {
-		_spec.SetField(serp.FieldLocation, field.TypeString, value)
-		_node.Location = value
 	}
 	if value, ok := sc.mutation.ContactInfo(); ok {
 		_spec.SetField(serp.FieldContactInfo, field.TypeJSON, value)

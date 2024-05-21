@@ -69,11 +69,6 @@ func Description(v string) predicate.SERP {
 	return predicate.SERP(sql.FieldEQ(FieldDescription, v))
 }
 
-// Location applies equality check predicate on the "location" field. It's identical to LocationEQ.
-func Location(v string) predicate.SERP {
-	return predicate.SERP(sql.FieldEQ(FieldLocation, v))
-}
-
 // IsRead applies equality check predicate on the "is_read" field. It's identical to IsReadEQ.
 func IsRead(v bool) predicate.SERP {
 	return predicate.SERP(sql.FieldEQ(FieldIsRead, v))
@@ -279,69 +274,14 @@ func DescriptionContainsFold(v string) predicate.SERP {
 	return predicate.SERP(sql.FieldContainsFold(FieldDescription, v))
 }
 
-// LocationEQ applies the EQ predicate on the "location" field.
-func LocationEQ(v string) predicate.SERP {
-	return predicate.SERP(sql.FieldEQ(FieldLocation, v))
+// ContactInfoIsNil applies the IsNil predicate on the "contact_info" field.
+func ContactInfoIsNil() predicate.SERP {
+	return predicate.SERP(sql.FieldIsNull(FieldContactInfo))
 }
 
-// LocationNEQ applies the NEQ predicate on the "location" field.
-func LocationNEQ(v string) predicate.SERP {
-	return predicate.SERP(sql.FieldNEQ(FieldLocation, v))
-}
-
-// LocationIn applies the In predicate on the "location" field.
-func LocationIn(vs ...string) predicate.SERP {
-	return predicate.SERP(sql.FieldIn(FieldLocation, vs...))
-}
-
-// LocationNotIn applies the NotIn predicate on the "location" field.
-func LocationNotIn(vs ...string) predicate.SERP {
-	return predicate.SERP(sql.FieldNotIn(FieldLocation, vs...))
-}
-
-// LocationGT applies the GT predicate on the "location" field.
-func LocationGT(v string) predicate.SERP {
-	return predicate.SERP(sql.FieldGT(FieldLocation, v))
-}
-
-// LocationGTE applies the GTE predicate on the "location" field.
-func LocationGTE(v string) predicate.SERP {
-	return predicate.SERP(sql.FieldGTE(FieldLocation, v))
-}
-
-// LocationLT applies the LT predicate on the "location" field.
-func LocationLT(v string) predicate.SERP {
-	return predicate.SERP(sql.FieldLT(FieldLocation, v))
-}
-
-// LocationLTE applies the LTE predicate on the "location" field.
-func LocationLTE(v string) predicate.SERP {
-	return predicate.SERP(sql.FieldLTE(FieldLocation, v))
-}
-
-// LocationContains applies the Contains predicate on the "location" field.
-func LocationContains(v string) predicate.SERP {
-	return predicate.SERP(sql.FieldContains(FieldLocation, v))
-}
-
-// LocationHasPrefix applies the HasPrefix predicate on the "location" field.
-func LocationHasPrefix(v string) predicate.SERP {
-	return predicate.SERP(sql.FieldHasPrefix(FieldLocation, v))
-}
-
-// LocationHasSuffix applies the HasSuffix predicate on the "location" field.
-func LocationHasSuffix(v string) predicate.SERP {
-	return predicate.SERP(sql.FieldHasSuffix(FieldLocation, v))
-}
-
-// LocationEqualFold applies the EqualFold predicate on the "location" field.
-func LocationEqualFold(v string) predicate.SERP {
-	return predicate.SERP(sql.FieldEqualFold(FieldLocation, v))
-}
-
-// LocationContainsFold applies the ContainsFold predicate on the "location" field.
-func LocationContainsFold(v string) predicate.SERP {
-	return predicate.SERP(sql.FieldContainsFold(FieldLocation, v))
+// ContactInfoNotNil applies the NotNil predicate on the "contact_info" field.
+func ContactInfoNotNil() predicate.SERP {
+	return predicate.SERP(sql.FieldNotNull(FieldContactInfo))
 }
 
 // IsReadEQ applies the EQ predicate on the "is_read" field.

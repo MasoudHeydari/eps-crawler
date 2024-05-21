@@ -8,3 +8,6 @@ import (
 
 // SERP is the predicate function for serp builders.
 type SERP func(*sql.Selector)
+
+// SearchQuery is the predicate function for searchquery builders.
+type SearchQuery func(*sql.Selector)

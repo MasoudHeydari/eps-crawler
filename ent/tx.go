@@ -14,6 +14,8 @@ type Tx struct {
 	config
 	// SERP is the client for interacting with the SERP builders.
 	SERP *SERPClient
+	// SearchQuery is the client for interacting with the SearchQuery builders.
+	SearchQuery *SearchQueryClient
 
 	// lazily loaded.
 	client     *Client
@@ -146,6 +148,7 @@ func (tx *Tx) Client() *Client {
 
 func (tx *Tx) init() {
 	tx.SERP = NewSERPClient(tx.config)
+	tx.SearchQuery = NewSearchQueryClient(tx.config)
 }
 
 // txDriver wraps the given dialect.Tx with a nop dialect.Driver implementation.

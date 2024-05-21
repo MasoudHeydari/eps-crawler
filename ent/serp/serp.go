@@ -19,8 +19,6 @@ const (
 	FieldTitle = "title"
 	// FieldDescription holds the string denoting the description field in the database.
 	FieldDescription = "description"
-	// FieldLocation holds the string denoting the location field in the database.
-	FieldLocation = "location"
 	// FieldContactInfo holds the string denoting the contact_info field in the database.
 	FieldContactInfo = "contact_info"
 	// FieldKeyWords holds the string denoting the key_words field in the database.
@@ -39,7 +37,6 @@ var Columns = []string{
 	FieldURL,
 	FieldTitle,
 	FieldDescription,
-	FieldLocation,
 	FieldContactInfo,
 	FieldKeyWords,
 	FieldIsRead,
@@ -88,11 +85,6 @@ func ByTitle(opts ...sql.OrderTermOption) OrderOption {
 // ByDescription orders the results by the description field.
 func ByDescription(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldDescription, opts...).ToFunc()
-}
-
-// ByLocation orders the results by the location field.
-func ByLocation(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldLocation, opts...).ToFunc()
 }
 
 // ByIsRead orders the results by the is_read field.

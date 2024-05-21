@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/karust/openserp/ent/schema"
+	"github.com/karust/openserp/ent/searchquery"
 	"github.com/karust/openserp/ent/serp"
 )
 
@@ -24,11 +25,21 @@ func init() {
 	// serp.TitleValidator is a validator for the "title" field. It is called by the builders before save.
 	serp.TitleValidator = serpDescTitle.Validators[0].(func(string) error)
 	// serpDescIsRead is the schema descriptor for is_read field.
-	serpDescIsRead := serpFields[6].Descriptor()
+	serpDescIsRead := serpFields[5].Descriptor()
 	// serp.DefaultIsRead holds the default value on creation for the is_read field.
 	serp.DefaultIsRead = serpDescIsRead.Default.(bool)
 	// serpDescCreatedAt is the schema descriptor for created_at field.
-	serpDescCreatedAt := serpFields[7].Descriptor()
+	serpDescCreatedAt := serpFields[6].Descriptor()
 	// serp.DefaultCreatedAt holds the default value on creation for the created_at field.
 	serp.DefaultCreatedAt = serpDescCreatedAt.Default.(func() time.Time)
+	searchqueryFields := schema.SearchQuery{}.Fields()
+	_ = searchqueryFields
+	// searchqueryDescQuery is the schema descriptor for query field.
+	searchqueryDescQuery := searchqueryFields[0].Descriptor()
+	// searchquery.QueryValidator is a validator for the "query" field. It is called by the builders before save.
+	searchquery.QueryValidator = searchqueryDescQuery.Validators[0].(func(string) error)
+	// searchqueryDescCreatedAt is the schema descriptor for created_at field.
+	searchqueryDescCreatedAt := searchqueryFields[3].Descriptor()
+	// searchquery.DefaultCreatedAt holds the default value on creation for the created_at field.
+	searchquery.DefaultCreatedAt = searchqueryDescCreatedAt.Default.(func() time.Time)
 }

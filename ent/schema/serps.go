@@ -7,15 +7,18 @@ import (
 	"entgo.io/ent/schema"
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
+	"github.com/karust/openserp/core"
 	"time"
 )
+
+var TimeStampWithTZ = map[string]string{dialect.Postgres: "TIMESTAMP(0) WITH TIME ZONE"}
 
 // SERP holds the schema definition for the SERPs entity.
 type SERP struct {
 	ent.Schema
 }
 
-// Annotations of the User.
+// Annotations of the SERP.
 func (SERP) Annotations() []schema.Annotation {
 	return []schema.Annotation{
 		entsql.Annotation{Table: "serps"},
@@ -28,11 +31,10 @@ func (SERP) Fields() []ent.Field {
 		field.String("url").NotEmpty(),
 		field.String("title").NotEmpty(),
 		field.String("description"),
-		field.String("location"),
-		field.JSON("contact_info", []string{}),
+		field.JSON("contact_info", core.ContactInfo{}).Optional(),
 		field.JSON("key_words", []string{}),
 		field.Bool("is_read").Default(false),
-		field.Time("created_at").SchemaType(map[string]string{dialect.Postgres: "TIMESTAMP(0) WITH TIME ZONE"}).Default(time.Now),
+		field.Time("created_at").SchemaType(TimeStampWithTZ).Default(time.Now),
 	}
 }
 

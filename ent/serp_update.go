@@ -12,6 +12,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/dialect/sql/sqljson"
 	"entgo.io/ent/schema/field"
+	"github.com/karust/openserp/core"
 	"github.com/karust/openserp/ent/predicate"
 	"github.com/karust/openserp/ent/serp"
 )
@@ -71,29 +72,23 @@ func (su *SERPUpdate) SetNillableDescription(s *string) *SERPUpdate {
 	return su
 }
 
-// SetLocation sets the "location" field.
-func (su *SERPUpdate) SetLocation(s string) *SERPUpdate {
-	su.mutation.SetLocation(s)
+// SetContactInfo sets the "contact_info" field.
+func (su *SERPUpdate) SetContactInfo(ci core.ContactInfo) *SERPUpdate {
+	su.mutation.SetContactInfo(ci)
 	return su
 }
 
-// SetNillableLocation sets the "location" field if the given value is not nil.
-func (su *SERPUpdate) SetNillableLocation(s *string) *SERPUpdate {
-	if s != nil {
-		su.SetLocation(*s)
+// SetNillableContactInfo sets the "contact_info" field if the given value is not nil.
+func (su *SERPUpdate) SetNillableContactInfo(ci *core.ContactInfo) *SERPUpdate {
+	if ci != nil {
+		su.SetContactInfo(*ci)
 	}
 	return su
 }
 
-// SetContactInfo sets the "contact_info" field.
-func (su *SERPUpdate) SetContactInfo(s []string) *SERPUpdate {
-	su.mutation.SetContactInfo(s)
-	return su
-}
-
-// AppendContactInfo appends s to the "contact_info" field.
-func (su *SERPUpdate) AppendContactInfo(s []string) *SERPUpdate {
-	su.mutation.AppendContactInfo(s)
+// ClearContactInfo clears the value of the "contact_info" field.
+func (su *SERPUpdate) ClearContactInfo() *SERPUpdate {
+	su.mutation.ClearContactInfo()
 	return su
 }
 
@@ -205,16 +200,11 @@ func (su *SERPUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if value, ok := su.mutation.Description(); ok {
 		_spec.SetField(serp.FieldDescription, field.TypeString, value)
 	}
-	if value, ok := su.mutation.Location(); ok {
-		_spec.SetField(serp.FieldLocation, field.TypeString, value)
-	}
 	if value, ok := su.mutation.ContactInfo(); ok {
 		_spec.SetField(serp.FieldContactInfo, field.TypeJSON, value)
 	}
-	if value, ok := su.mutation.AppendedContactInfo(); ok {
-		_spec.AddModifier(func(u *sql.UpdateBuilder) {
-			sqljson.Append(u, serp.FieldContactInfo, value)
-		})
+	if su.mutation.ContactInfoCleared() {
+		_spec.ClearField(serp.FieldContactInfo, field.TypeJSON)
 	}
 	if value, ok := su.mutation.KeyWords(); ok {
 		_spec.SetField(serp.FieldKeyWords, field.TypeJSON, value)
@@ -292,29 +282,23 @@ func (suo *SERPUpdateOne) SetNillableDescription(s *string) *SERPUpdateOne {
 	return suo
 }
 
-// SetLocation sets the "location" field.
-func (suo *SERPUpdateOne) SetLocation(s string) *SERPUpdateOne {
-	suo.mutation.SetLocation(s)
+// SetContactInfo sets the "contact_info" field.
+func (suo *SERPUpdateOne) SetContactInfo(ci core.ContactInfo) *SERPUpdateOne {
+	suo.mutation.SetContactInfo(ci)
 	return suo
 }
 
-// SetNillableLocation sets the "location" field if the given value is not nil.
-func (suo *SERPUpdateOne) SetNillableLocation(s *string) *SERPUpdateOne {
-	if s != nil {
-		suo.SetLocation(*s)
+// SetNillableContactInfo sets the "contact_info" field if the given value is not nil.
+func (suo *SERPUpdateOne) SetNillableContactInfo(ci *core.ContactInfo) *SERPUpdateOne {
+	if ci != nil {
+		suo.SetContactInfo(*ci)
 	}
 	return suo
 }
 
-// SetContactInfo sets the "contact_info" field.
-func (suo *SERPUpdateOne) SetContactInfo(s []string) *SERPUpdateOne {
-	suo.mutation.SetContactInfo(s)
-	return suo
-}
-
-// AppendContactInfo appends s to the "contact_info" field.
-func (suo *SERPUpdateOne) AppendContactInfo(s []string) *SERPUpdateOne {
-	suo.mutation.AppendContactInfo(s)
+// ClearContactInfo clears the value of the "contact_info" field.
+func (suo *SERPUpdateOne) ClearContactInfo() *SERPUpdateOne {
+	suo.mutation.ClearContactInfo()
 	return suo
 }
 
@@ -456,16 +440,11 @@ func (suo *SERPUpdateOne) sqlSave(ctx context.Context) (_node *SERP, err error) 
 	if value, ok := suo.mutation.Description(); ok {
 		_spec.SetField(serp.FieldDescription, field.TypeString, value)
 	}
-	if value, ok := suo.mutation.Location(); ok {
-		_spec.SetField(serp.FieldLocation, field.TypeString, value)
-	}
 	if value, ok := suo.mutation.ContactInfo(); ok {
 		_spec.SetField(serp.FieldContactInfo, field.TypeJSON, value)
 	}
-	if value, ok := suo.mutation.AppendedContactInfo(); ok {
-		_spec.AddModifier(func(u *sql.UpdateBuilder) {
-			sqljson.Append(u, serp.FieldContactInfo, value)
-		})
+	if suo.mutation.ContactInfoCleared() {
+		_spec.ClearField(serp.FieldContactInfo, field.TypeJSON)
 	}
 	if value, ok := suo.mutation.KeyWords(); ok {
 		_spec.SetField(serp.FieldKeyWords, field.TypeJSON, value)

@@ -11,7 +11,9 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
+	"github.com/karust/openserp/core"
 	"github.com/karust/openserp/ent/predicate"
+	"github.com/karust/openserp/ent/searchquery"
 	"github.com/karust/openserp/ent/serp"
 )
 
@@ -24,29 +26,28 @@ const (
 	OpUpdateOne = ent.OpUpdateOne
 
 	// Node types.
-	TypeSERP = "SERP"
+	TypeSERP        = "SERP"
+	TypeSearchQuery = "SearchQuery"
 )
 
 // SERPMutation represents an operation that mutates the SERP nodes in the graph.
 type SERPMutation struct {
 	config
-	op                 Op
-	typ                string
-	id                 *int
-	url                *string
-	title              *string
-	description        *string
-	location           *string
-	contact_info       *[]string
-	appendcontact_info []string
-	key_words          *[]string
-	appendkey_words    []string
-	is_read            *bool
-	created_at         *time.Time
-	clearedFields      map[string]struct{}
-	done               bool
-	oldValue           func(context.Context) (*SERP, error)
-	predicates         []predicate.SERP
+	op              Op
+	typ             string
+	id              *int
+	url             *string
+	title           *string
+	description     *string
+	contact_info    *core.ContactInfo
+	key_words       *[]string
+	appendkey_words []string
+	is_read         *bool
+	created_at      *time.Time
+	clearedFields   map[string]struct{}
+	done            bool
+	oldValue        func(context.Context) (*SERP, error)
+	predicates      []predicate.SERP
 }
 
 var _ ent.Mutation = (*SERPMutation)(nil)
@@ -255,50 +256,13 @@ func (m *SERPMutation) ResetDescription() {
 	m.description = nil
 }
 
-// SetLocation sets the "location" field.
-func (m *SERPMutation) SetLocation(s string) {
-	m.location = &s
-}
-
-// Location returns the value of the "location" field in the mutation.
-func (m *SERPMutation) Location() (r string, exists bool) {
-	v := m.location
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldLocation returns the old "location" field's value of the SERP entity.
-// If the SERP object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *SERPMutation) OldLocation(ctx context.Context) (v string, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldLocation is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldLocation requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldLocation: %w", err)
-	}
-	return oldValue.Location, nil
-}
-
-// ResetLocation resets all changes to the "location" field.
-func (m *SERPMutation) ResetLocation() {
-	m.location = nil
-}
-
 // SetContactInfo sets the "contact_info" field.
-func (m *SERPMutation) SetContactInfo(s []string) {
-	m.contact_info = &s
-	m.appendcontact_info = nil
+func (m *SERPMutation) SetContactInfo(ci core.ContactInfo) {
+	m.contact_info = &ci
 }
 
 // ContactInfo returns the value of the "contact_info" field in the mutation.
-func (m *SERPMutation) ContactInfo() (r []string, exists bool) {
+func (m *SERPMutation) ContactInfo() (r core.ContactInfo, exists bool) {
 	v := m.contact_info
 	if v == nil {
 		return
@@ -309,7 +273,7 @@ func (m *SERPMutation) ContactInfo() (r []string, exists bool) {
 // OldContactInfo returns the old "contact_info" field's value of the SERP entity.
 // If the SERP object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *SERPMutation) OldContactInfo(ctx context.Context) (v []string, err error) {
+func (m *SERPMutation) OldContactInfo(ctx context.Context) (v core.ContactInfo, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldContactInfo is only allowed on UpdateOne operations")
 	}
@@ -323,23 +287,22 @@ func (m *SERPMutation) OldContactInfo(ctx context.Context) (v []string, err erro
 	return oldValue.ContactInfo, nil
 }
 
-// AppendContactInfo adds s to the "contact_info" field.
-func (m *SERPMutation) AppendContactInfo(s []string) {
-	m.appendcontact_info = append(m.appendcontact_info, s...)
+// ClearContactInfo clears the value of the "contact_info" field.
+func (m *SERPMutation) ClearContactInfo() {
+	m.contact_info = nil
+	m.clearedFields[serp.FieldContactInfo] = struct{}{}
 }
 
-// AppendedContactInfo returns the list of values that were appended to the "contact_info" field in this mutation.
-func (m *SERPMutation) AppendedContactInfo() ([]string, bool) {
-	if len(m.appendcontact_info) == 0 {
-		return nil, false
-	}
-	return m.appendcontact_info, true
+// ContactInfoCleared returns if the "contact_info" field was cleared in this mutation.
+func (m *SERPMutation) ContactInfoCleared() bool {
+	_, ok := m.clearedFields[serp.FieldContactInfo]
+	return ok
 }
 
 // ResetContactInfo resets all changes to the "contact_info" field.
 func (m *SERPMutation) ResetContactInfo() {
 	m.contact_info = nil
-	m.appendcontact_info = nil
+	delete(m.clearedFields, serp.FieldContactInfo)
 }
 
 // SetKeyWords sets the "key_words" field.
@@ -499,7 +462,7 @@ func (m *SERPMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *SERPMutation) Fields() []string {
-	fields := make([]string, 0, 8)
+	fields := make([]string, 0, 7)
 	if m.url != nil {
 		fields = append(fields, serp.FieldURL)
 	}
@@ -508,9 +471,6 @@ func (m *SERPMutation) Fields() []string {
 	}
 	if m.description != nil {
 		fields = append(fields, serp.FieldDescription)
-	}
-	if m.location != nil {
-		fields = append(fields, serp.FieldLocation)
 	}
 	if m.contact_info != nil {
 		fields = append(fields, serp.FieldContactInfo)
@@ -538,8 +498,6 @@ func (m *SERPMutation) Field(name string) (ent.Value, bool) {
 		return m.Title()
 	case serp.FieldDescription:
 		return m.Description()
-	case serp.FieldLocation:
-		return m.Location()
 	case serp.FieldContactInfo:
 		return m.ContactInfo()
 	case serp.FieldKeyWords:
@@ -563,8 +521,6 @@ func (m *SERPMutation) OldField(ctx context.Context, name string) (ent.Value, er
 		return m.OldTitle(ctx)
 	case serp.FieldDescription:
 		return m.OldDescription(ctx)
-	case serp.FieldLocation:
-		return m.OldLocation(ctx)
 	case serp.FieldContactInfo:
 		return m.OldContactInfo(ctx)
 	case serp.FieldKeyWords:
@@ -603,15 +559,8 @@ func (m *SERPMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetDescription(v)
 		return nil
-	case serp.FieldLocation:
-		v, ok := value.(string)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetLocation(v)
-		return nil
 	case serp.FieldContactInfo:
-		v, ok := value.([]string)
+		v, ok := value.(core.ContactInfo)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
@@ -667,7 +616,11 @@ func (m *SERPMutation) AddField(name string, value ent.Value) error {
 // ClearedFields returns all nullable fields that were cleared during this
 // mutation.
 func (m *SERPMutation) ClearedFields() []string {
-	return nil
+	var fields []string
+	if m.FieldCleared(serp.FieldContactInfo) {
+		fields = append(fields, serp.FieldContactInfo)
+	}
+	return fields
 }
 
 // FieldCleared returns a boolean indicating if a field with the given name was
@@ -680,6 +633,11 @@ func (m *SERPMutation) FieldCleared(name string) bool {
 // ClearField clears the value of the field with the given name. It returns an
 // error if the field is not defined in the schema.
 func (m *SERPMutation) ClearField(name string) error {
+	switch name {
+	case serp.FieldContactInfo:
+		m.ClearContactInfo()
+		return nil
+	}
 	return fmt.Errorf("unknown SERP nullable field %s", name)
 }
 
@@ -695,9 +653,6 @@ func (m *SERPMutation) ResetField(name string) error {
 		return nil
 	case serp.FieldDescription:
 		m.ResetDescription()
-		return nil
-	case serp.FieldLocation:
-		m.ResetLocation()
 		return nil
 	case serp.FieldContactInfo:
 		m.ResetContactInfo()
@@ -761,4 +716,492 @@ func (m *SERPMutation) ClearEdge(name string) error {
 // It returns an error if the edge is not defined in the schema.
 func (m *SERPMutation) ResetEdge(name string) error {
 	return fmt.Errorf("unknown SERP edge %s", name)
+}
+
+// SearchQueryMutation represents an operation that mutates the SearchQuery nodes in the graph.
+type SearchQueryMutation struct {
+	config
+	op            Op
+	typ           string
+	id            *int
+	query         *string
+	location      *string
+	language      *string
+	created_at    *time.Time
+	clearedFields map[string]struct{}
+	done          bool
+	oldValue      func(context.Context) (*SearchQuery, error)
+	predicates    []predicate.SearchQuery
+}
+
+var _ ent.Mutation = (*SearchQueryMutation)(nil)
+
+// searchqueryOption allows management of the mutation configuration using functional options.
+type searchqueryOption func(*SearchQueryMutation)
+
+// newSearchQueryMutation creates new mutation for the SearchQuery entity.
+func newSearchQueryMutation(c config, op Op, opts ...searchqueryOption) *SearchQueryMutation {
+	m := &SearchQueryMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeSearchQuery,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withSearchQueryID sets the ID field of the mutation.
+func withSearchQueryID(id int) searchqueryOption {
+	return func(m *SearchQueryMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *SearchQuery
+		)
+		m.oldValue = func(ctx context.Context) (*SearchQuery, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().SearchQuery.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withSearchQuery sets the old SearchQuery of the mutation.
+func withSearchQuery(node *SearchQuery) searchqueryOption {
+	return func(m *SearchQueryMutation) {
+		m.oldValue = func(context.Context) (*SearchQuery, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m SearchQueryMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m SearchQueryMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *SearchQueryMutation) ID() (id int, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *SearchQueryMutation) IDs(ctx context.Context) ([]int, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().SearchQuery.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetQuery sets the "query" field.
+func (m *SearchQueryMutation) SetQuery(s string) {
+	m.query = &s
+}
+
+// Query returns the value of the "query" field in the mutation.
+func (m *SearchQueryMutation) Query() (r string, exists bool) {
+	v := m.query
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldQuery returns the old "query" field's value of the SearchQuery entity.
+// If the SearchQuery object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SearchQueryMutation) OldQuery(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldQuery is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldQuery requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldQuery: %w", err)
+	}
+	return oldValue.Query, nil
+}
+
+// ResetQuery resets all changes to the "query" field.
+func (m *SearchQueryMutation) ResetQuery() {
+	m.query = nil
+}
+
+// SetLocation sets the "location" field.
+func (m *SearchQueryMutation) SetLocation(s string) {
+	m.location = &s
+}
+
+// Location returns the value of the "location" field in the mutation.
+func (m *SearchQueryMutation) Location() (r string, exists bool) {
+	v := m.location
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldLocation returns the old "location" field's value of the SearchQuery entity.
+// If the SearchQuery object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SearchQueryMutation) OldLocation(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldLocation is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldLocation requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldLocation: %w", err)
+	}
+	return oldValue.Location, nil
+}
+
+// ResetLocation resets all changes to the "location" field.
+func (m *SearchQueryMutation) ResetLocation() {
+	m.location = nil
+}
+
+// SetLanguage sets the "language" field.
+func (m *SearchQueryMutation) SetLanguage(s string) {
+	m.language = &s
+}
+
+// Language returns the value of the "language" field in the mutation.
+func (m *SearchQueryMutation) Language() (r string, exists bool) {
+	v := m.language
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldLanguage returns the old "language" field's value of the SearchQuery entity.
+// If the SearchQuery object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SearchQueryMutation) OldLanguage(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldLanguage is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldLanguage requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldLanguage: %w", err)
+	}
+	return oldValue.Language, nil
+}
+
+// ResetLanguage resets all changes to the "language" field.
+func (m *SearchQueryMutation) ResetLanguage() {
+	m.language = nil
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *SearchQueryMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *SearchQueryMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the SearchQuery entity.
+// If the SearchQuery object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SearchQueryMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *SearchQueryMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// Where appends a list predicates to the SearchQueryMutation builder.
+func (m *SearchQueryMutation) Where(ps ...predicate.SearchQuery) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the SearchQueryMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *SearchQueryMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.SearchQuery, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *SearchQueryMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *SearchQueryMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (SearchQuery).
+func (m *SearchQueryMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *SearchQueryMutation) Fields() []string {
+	fields := make([]string, 0, 4)
+	if m.query != nil {
+		fields = append(fields, searchquery.FieldQuery)
+	}
+	if m.location != nil {
+		fields = append(fields, searchquery.FieldLocation)
+	}
+	if m.language != nil {
+		fields = append(fields, searchquery.FieldLanguage)
+	}
+	if m.created_at != nil {
+		fields = append(fields, searchquery.FieldCreatedAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *SearchQueryMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case searchquery.FieldQuery:
+		return m.Query()
+	case searchquery.FieldLocation:
+		return m.Location()
+	case searchquery.FieldLanguage:
+		return m.Language()
+	case searchquery.FieldCreatedAt:
+		return m.CreatedAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *SearchQueryMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case searchquery.FieldQuery:
+		return m.OldQuery(ctx)
+	case searchquery.FieldLocation:
+		return m.OldLocation(ctx)
+	case searchquery.FieldLanguage:
+		return m.OldLanguage(ctx)
+	case searchquery.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown SearchQuery field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *SearchQueryMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case searchquery.FieldQuery:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetQuery(v)
+		return nil
+	case searchquery.FieldLocation:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetLocation(v)
+		return nil
+	case searchquery.FieldLanguage:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetLanguage(v)
+		return nil
+	case searchquery.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown SearchQuery field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *SearchQueryMutation) AddedFields() []string {
+	return nil
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *SearchQueryMutation) AddedField(name string) (ent.Value, bool) {
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *SearchQueryMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	}
+	return fmt.Errorf("unknown SearchQuery numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *SearchQueryMutation) ClearedFields() []string {
+	return nil
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *SearchQueryMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *SearchQueryMutation) ClearField(name string) error {
+	return fmt.Errorf("unknown SearchQuery nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *SearchQueryMutation) ResetField(name string) error {
+	switch name {
+	case searchquery.FieldQuery:
+		m.ResetQuery()
+		return nil
+	case searchquery.FieldLocation:
+		m.ResetLocation()
+		return nil
+	case searchquery.FieldLanguage:
+		m.ResetLanguage()
+		return nil
+	case searchquery.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown SearchQuery field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *SearchQueryMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *SearchQueryMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *SearchQueryMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *SearchQueryMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *SearchQueryMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *SearchQueryMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *SearchQueryMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown SearchQuery unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *SearchQueryMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown SearchQuery edge %s", name)
 }
