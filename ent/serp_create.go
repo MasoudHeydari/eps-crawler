@@ -8,9 +8,11 @@ import (
 	"fmt"
 	"time"
 
+	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/karust/openserp/core"
+	"github.com/karust/openserp/ent/searchquery"
 	"github.com/karust/openserp/ent/serp"
 )
 
@@ -19,6 +21,7 @@ type SERPCreate struct {
 	config
 	mutation *SERPMutation
 	hooks    []Hook
+	conflict []sql.ConflictOption
 }
 
 // SetURL sets the "url" field.
@@ -73,6 +76,20 @@ func (sc *SERPCreate) SetNillableIsRead(b *bool) *SERPCreate {
 	return sc
 }
 
+// SetSqID sets the "sq_id" field.
+func (sc *SERPCreate) SetSqID(i int) *SERPCreate {
+	sc.mutation.SetSqID(i)
+	return sc
+}
+
+// SetNillableSqID sets the "sq_id" field if the given value is not nil.
+func (sc *SERPCreate) SetNillableSqID(i *int) *SERPCreate {
+	if i != nil {
+		sc.SetSqID(*i)
+	}
+	return sc
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (sc *SERPCreate) SetCreatedAt(t time.Time) *SERPCreate {
 	sc.mutation.SetCreatedAt(t)
@@ -85,6 +102,25 @@ func (sc *SERPCreate) SetNillableCreatedAt(t *time.Time) *SERPCreate {
 		sc.SetCreatedAt(*t)
 	}
 	return sc
+}
+
+// SetSearchQueryID sets the "search_query" edge to the SearchQuery entity by ID.
+func (sc *SERPCreate) SetSearchQueryID(id int) *SERPCreate {
+	sc.mutation.SetSearchQueryID(id)
+	return sc
+}
+
+// SetNillableSearchQueryID sets the "search_query" edge to the SearchQuery entity by ID if the given value is not nil.
+func (sc *SERPCreate) SetNillableSearchQueryID(id *int) *SERPCreate {
+	if id != nil {
+		sc = sc.SetSearchQueryID(*id)
+	}
+	return sc
+}
+
+// SetSearchQuery sets the "search_query" edge to the SearchQuery entity.
+func (sc *SERPCreate) SetSearchQuery(s *SearchQuery) *SERPCreate {
+	return sc.SetSearchQueryID(s.ID)
 }
 
 // Mutation returns the SERPMutation object of the builder.
@@ -188,6 +224,7 @@ func (sc *SERPCreate) createSpec() (*SERP, *sqlgraph.CreateSpec) {
 		_node = &SERP{config: sc.config}
 		_spec = sqlgraph.NewCreateSpec(serp.Table, sqlgraph.NewFieldSpec(serp.FieldID, field.TypeInt))
 	)
+	_spec.OnConflict = sc.conflict
 	if value, ok := sc.mutation.URL(); ok {
 		_spec.SetField(serp.FieldURL, field.TypeString, value)
 		_node.URL = value
@@ -216,7 +253,380 @@ func (sc *SERPCreate) createSpec() (*SERP, *sqlgraph.CreateSpec) {
 		_spec.SetField(serp.FieldCreatedAt, field.TypeTime, value)
 		_node.CreatedAt = value
 	}
+	if nodes := sc.mutation.SearchQueryIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   serp.SearchQueryTable,
+			Columns: []string{serp.SearchQueryColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(searchquery.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_node.SqID = nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
+	}
 	return _node, _spec
+}
+
+// OnConflict allows configuring the `ON CONFLICT` / `ON DUPLICATE KEY` clause
+// of the `INSERT` statement. For example:
+//
+//	client.SERP.Create().
+//		SetURL(v).
+//		OnConflict(
+//			// Update the row with the new values
+//			// the was proposed for insertion.
+//			sql.ResolveWithNewValues(),
+//		).
+//		// Override some of the fields with custom
+//		// update values.
+//		Update(func(u *ent.SERPUpsert) {
+//			SetURL(v+v).
+//		}).
+//		Exec(ctx)
+func (sc *SERPCreate) OnConflict(opts ...sql.ConflictOption) *SERPUpsertOne {
+	sc.conflict = opts
+	return &SERPUpsertOne{
+		create: sc,
+	}
+}
+
+// OnConflictColumns calls `OnConflict` and configures the columns
+// as conflict target. Using this option is equivalent to using:
+//
+//	client.SERP.Create().
+//		OnConflict(sql.ConflictColumns(columns...)).
+//		Exec(ctx)
+func (sc *SERPCreate) OnConflictColumns(columns ...string) *SERPUpsertOne {
+	sc.conflict = append(sc.conflict, sql.ConflictColumns(columns...))
+	return &SERPUpsertOne{
+		create: sc,
+	}
+}
+
+type (
+	// SERPUpsertOne is the builder for "upsert"-ing
+	//  one SERP node.
+	SERPUpsertOne struct {
+		create *SERPCreate
+	}
+
+	// SERPUpsert is the "OnConflict" setter.
+	SERPUpsert struct {
+		*sql.UpdateSet
+	}
+)
+
+// SetURL sets the "url" field.
+func (u *SERPUpsert) SetURL(v string) *SERPUpsert {
+	u.Set(serp.FieldURL, v)
+	return u
+}
+
+// UpdateURL sets the "url" field to the value that was provided on create.
+func (u *SERPUpsert) UpdateURL() *SERPUpsert {
+	u.SetExcluded(serp.FieldURL)
+	return u
+}
+
+// SetTitle sets the "title" field.
+func (u *SERPUpsert) SetTitle(v string) *SERPUpsert {
+	u.Set(serp.FieldTitle, v)
+	return u
+}
+
+// UpdateTitle sets the "title" field to the value that was provided on create.
+func (u *SERPUpsert) UpdateTitle() *SERPUpsert {
+	u.SetExcluded(serp.FieldTitle)
+	return u
+}
+
+// SetDescription sets the "description" field.
+func (u *SERPUpsert) SetDescription(v string) *SERPUpsert {
+	u.Set(serp.FieldDescription, v)
+	return u
+}
+
+// UpdateDescription sets the "description" field to the value that was provided on create.
+func (u *SERPUpsert) UpdateDescription() *SERPUpsert {
+	u.SetExcluded(serp.FieldDescription)
+	return u
+}
+
+// SetContactInfo sets the "contact_info" field.
+func (u *SERPUpsert) SetContactInfo(v core.ContactInfo) *SERPUpsert {
+	u.Set(serp.FieldContactInfo, v)
+	return u
+}
+
+// UpdateContactInfo sets the "contact_info" field to the value that was provided on create.
+func (u *SERPUpsert) UpdateContactInfo() *SERPUpsert {
+	u.SetExcluded(serp.FieldContactInfo)
+	return u
+}
+
+// ClearContactInfo clears the value of the "contact_info" field.
+func (u *SERPUpsert) ClearContactInfo() *SERPUpsert {
+	u.SetNull(serp.FieldContactInfo)
+	return u
+}
+
+// SetKeyWords sets the "key_words" field.
+func (u *SERPUpsert) SetKeyWords(v []string) *SERPUpsert {
+	u.Set(serp.FieldKeyWords, v)
+	return u
+}
+
+// UpdateKeyWords sets the "key_words" field to the value that was provided on create.
+func (u *SERPUpsert) UpdateKeyWords() *SERPUpsert {
+	u.SetExcluded(serp.FieldKeyWords)
+	return u
+}
+
+// SetIsRead sets the "is_read" field.
+func (u *SERPUpsert) SetIsRead(v bool) *SERPUpsert {
+	u.Set(serp.FieldIsRead, v)
+	return u
+}
+
+// UpdateIsRead sets the "is_read" field to the value that was provided on create.
+func (u *SERPUpsert) UpdateIsRead() *SERPUpsert {
+	u.SetExcluded(serp.FieldIsRead)
+	return u
+}
+
+// SetSqID sets the "sq_id" field.
+func (u *SERPUpsert) SetSqID(v int) *SERPUpsert {
+	u.Set(serp.FieldSqID, v)
+	return u
+}
+
+// UpdateSqID sets the "sq_id" field to the value that was provided on create.
+func (u *SERPUpsert) UpdateSqID() *SERPUpsert {
+	u.SetExcluded(serp.FieldSqID)
+	return u
+}
+
+// ClearSqID clears the value of the "sq_id" field.
+func (u *SERPUpsert) ClearSqID() *SERPUpsert {
+	u.SetNull(serp.FieldSqID)
+	return u
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (u *SERPUpsert) SetCreatedAt(v time.Time) *SERPUpsert {
+	u.Set(serp.FieldCreatedAt, v)
+	return u
+}
+
+// UpdateCreatedAt sets the "created_at" field to the value that was provided on create.
+func (u *SERPUpsert) UpdateCreatedAt() *SERPUpsert {
+	u.SetExcluded(serp.FieldCreatedAt)
+	return u
+}
+
+// UpdateNewValues updates the mutable fields using the new values that were set on create.
+// Using this option is equivalent to using:
+//
+//	client.SERP.Create().
+//		OnConflict(
+//			sql.ResolveWithNewValues(),
+//		).
+//		Exec(ctx)
+func (u *SERPUpsertOne) UpdateNewValues() *SERPUpsertOne {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWithNewValues())
+	return u
+}
+
+// Ignore sets each column to itself in case of conflict.
+// Using this option is equivalent to using:
+//
+//	client.SERP.Create().
+//	    OnConflict(sql.ResolveWithIgnore()).
+//	    Exec(ctx)
+func (u *SERPUpsertOne) Ignore() *SERPUpsertOne {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWithIgnore())
+	return u
+}
+
+// DoNothing configures the conflict_action to `DO NOTHING`.
+// Supported only by SQLite and PostgreSQL.
+func (u *SERPUpsertOne) DoNothing() *SERPUpsertOne {
+	u.create.conflict = append(u.create.conflict, sql.DoNothing())
+	return u
+}
+
+// Update allows overriding fields `UPDATE` values. See the SERPCreate.OnConflict
+// documentation for more info.
+func (u *SERPUpsertOne) Update(set func(*SERPUpsert)) *SERPUpsertOne {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWith(func(update *sql.UpdateSet) {
+		set(&SERPUpsert{UpdateSet: update})
+	}))
+	return u
+}
+
+// SetURL sets the "url" field.
+func (u *SERPUpsertOne) SetURL(v string) *SERPUpsertOne {
+	return u.Update(func(s *SERPUpsert) {
+		s.SetURL(v)
+	})
+}
+
+// UpdateURL sets the "url" field to the value that was provided on create.
+func (u *SERPUpsertOne) UpdateURL() *SERPUpsertOne {
+	return u.Update(func(s *SERPUpsert) {
+		s.UpdateURL()
+	})
+}
+
+// SetTitle sets the "title" field.
+func (u *SERPUpsertOne) SetTitle(v string) *SERPUpsertOne {
+	return u.Update(func(s *SERPUpsert) {
+		s.SetTitle(v)
+	})
+}
+
+// UpdateTitle sets the "title" field to the value that was provided on create.
+func (u *SERPUpsertOne) UpdateTitle() *SERPUpsertOne {
+	return u.Update(func(s *SERPUpsert) {
+		s.UpdateTitle()
+	})
+}
+
+// SetDescription sets the "description" field.
+func (u *SERPUpsertOne) SetDescription(v string) *SERPUpsertOne {
+	return u.Update(func(s *SERPUpsert) {
+		s.SetDescription(v)
+	})
+}
+
+// UpdateDescription sets the "description" field to the value that was provided on create.
+func (u *SERPUpsertOne) UpdateDescription() *SERPUpsertOne {
+	return u.Update(func(s *SERPUpsert) {
+		s.UpdateDescription()
+	})
+}
+
+// SetContactInfo sets the "contact_info" field.
+func (u *SERPUpsertOne) SetContactInfo(v core.ContactInfo) *SERPUpsertOne {
+	return u.Update(func(s *SERPUpsert) {
+		s.SetContactInfo(v)
+	})
+}
+
+// UpdateContactInfo sets the "contact_info" field to the value that was provided on create.
+func (u *SERPUpsertOne) UpdateContactInfo() *SERPUpsertOne {
+	return u.Update(func(s *SERPUpsert) {
+		s.UpdateContactInfo()
+	})
+}
+
+// ClearContactInfo clears the value of the "contact_info" field.
+func (u *SERPUpsertOne) ClearContactInfo() *SERPUpsertOne {
+	return u.Update(func(s *SERPUpsert) {
+		s.ClearContactInfo()
+	})
+}
+
+// SetKeyWords sets the "key_words" field.
+func (u *SERPUpsertOne) SetKeyWords(v []string) *SERPUpsertOne {
+	return u.Update(func(s *SERPUpsert) {
+		s.SetKeyWords(v)
+	})
+}
+
+// UpdateKeyWords sets the "key_words" field to the value that was provided on create.
+func (u *SERPUpsertOne) UpdateKeyWords() *SERPUpsertOne {
+	return u.Update(func(s *SERPUpsert) {
+		s.UpdateKeyWords()
+	})
+}
+
+// SetIsRead sets the "is_read" field.
+func (u *SERPUpsertOne) SetIsRead(v bool) *SERPUpsertOne {
+	return u.Update(func(s *SERPUpsert) {
+		s.SetIsRead(v)
+	})
+}
+
+// UpdateIsRead sets the "is_read" field to the value that was provided on create.
+func (u *SERPUpsertOne) UpdateIsRead() *SERPUpsertOne {
+	return u.Update(func(s *SERPUpsert) {
+		s.UpdateIsRead()
+	})
+}
+
+// SetSqID sets the "sq_id" field.
+func (u *SERPUpsertOne) SetSqID(v int) *SERPUpsertOne {
+	return u.Update(func(s *SERPUpsert) {
+		s.SetSqID(v)
+	})
+}
+
+// UpdateSqID sets the "sq_id" field to the value that was provided on create.
+func (u *SERPUpsertOne) UpdateSqID() *SERPUpsertOne {
+	return u.Update(func(s *SERPUpsert) {
+		s.UpdateSqID()
+	})
+}
+
+// ClearSqID clears the value of the "sq_id" field.
+func (u *SERPUpsertOne) ClearSqID() *SERPUpsertOne {
+	return u.Update(func(s *SERPUpsert) {
+		s.ClearSqID()
+	})
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (u *SERPUpsertOne) SetCreatedAt(v time.Time) *SERPUpsertOne {
+	return u.Update(func(s *SERPUpsert) {
+		s.SetCreatedAt(v)
+	})
+}
+
+// UpdateCreatedAt sets the "created_at" field to the value that was provided on create.
+func (u *SERPUpsertOne) UpdateCreatedAt() *SERPUpsertOne {
+	return u.Update(func(s *SERPUpsert) {
+		s.UpdateCreatedAt()
+	})
+}
+
+// Exec executes the query.
+func (u *SERPUpsertOne) Exec(ctx context.Context) error {
+	if len(u.create.conflict) == 0 {
+		return errors.New("ent: missing options for SERPCreate.OnConflict")
+	}
+	return u.create.Exec(ctx)
+}
+
+// ExecX is like Exec, but panics if an error occurs.
+func (u *SERPUpsertOne) ExecX(ctx context.Context) {
+	if err := u.create.Exec(ctx); err != nil {
+		panic(err)
+	}
+}
+
+// Exec executes the UPSERT query and returns the inserted/updated ID.
+func (u *SERPUpsertOne) ID(ctx context.Context) (id int, err error) {
+	node, err := u.create.Save(ctx)
+	if err != nil {
+		return id, err
+	}
+	return node.ID, nil
+}
+
+// IDX is like ID, but panics if an error occurs.
+func (u *SERPUpsertOne) IDX(ctx context.Context) int {
+	id, err := u.ID(ctx)
+	if err != nil {
+		panic(err)
+	}
+	return id
 }
 
 // SERPCreateBulk is the builder for creating many SERP entities in bulk.
@@ -224,6 +634,7 @@ type SERPCreateBulk struct {
 	config
 	err      error
 	builders []*SERPCreate
+	conflict []sql.ConflictOption
 }
 
 // Save creates the SERP entities in the database.
@@ -253,6 +664,7 @@ func (scb *SERPCreateBulk) Save(ctx context.Context) ([]*SERP, error) {
 					_, err = mutators[i+1].Mutate(root, scb.builders[i+1].mutation)
 				} else {
 					spec := &sqlgraph.BatchCreateSpec{Nodes: specs}
+					spec.OnConflict = scb.conflict
 					// Invoke the actual operation on the latest mutation in the chain.
 					if err = sqlgraph.BatchCreate(ctx, scb.driver, spec); err != nil {
 						if sqlgraph.IsConstraintError(err) {
@@ -303,6 +715,236 @@ func (scb *SERPCreateBulk) Exec(ctx context.Context) error {
 // ExecX is like Exec, but panics if an error occurs.
 func (scb *SERPCreateBulk) ExecX(ctx context.Context) {
 	if err := scb.Exec(ctx); err != nil {
+		panic(err)
+	}
+}
+
+// OnConflict allows configuring the `ON CONFLICT` / `ON DUPLICATE KEY` clause
+// of the `INSERT` statement. For example:
+//
+//	client.SERP.CreateBulk(builders...).
+//		OnConflict(
+//			// Update the row with the new values
+//			// the was proposed for insertion.
+//			sql.ResolveWithNewValues(),
+//		).
+//		// Override some of the fields with custom
+//		// update values.
+//		Update(func(u *ent.SERPUpsert) {
+//			SetURL(v+v).
+//		}).
+//		Exec(ctx)
+func (scb *SERPCreateBulk) OnConflict(opts ...sql.ConflictOption) *SERPUpsertBulk {
+	scb.conflict = opts
+	return &SERPUpsertBulk{
+		create: scb,
+	}
+}
+
+// OnConflictColumns calls `OnConflict` and configures the columns
+// as conflict target. Using this option is equivalent to using:
+//
+//	client.SERP.Create().
+//		OnConflict(sql.ConflictColumns(columns...)).
+//		Exec(ctx)
+func (scb *SERPCreateBulk) OnConflictColumns(columns ...string) *SERPUpsertBulk {
+	scb.conflict = append(scb.conflict, sql.ConflictColumns(columns...))
+	return &SERPUpsertBulk{
+		create: scb,
+	}
+}
+
+// SERPUpsertBulk is the builder for "upsert"-ing
+// a bulk of SERP nodes.
+type SERPUpsertBulk struct {
+	create *SERPCreateBulk
+}
+
+// UpdateNewValues updates the mutable fields using the new values that
+// were set on create. Using this option is equivalent to using:
+//
+//	client.SERP.Create().
+//		OnConflict(
+//			sql.ResolveWithNewValues(),
+//		).
+//		Exec(ctx)
+func (u *SERPUpsertBulk) UpdateNewValues() *SERPUpsertBulk {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWithNewValues())
+	return u
+}
+
+// Ignore sets each column to itself in case of conflict.
+// Using this option is equivalent to using:
+//
+//	client.SERP.Create().
+//		OnConflict(sql.ResolveWithIgnore()).
+//		Exec(ctx)
+func (u *SERPUpsertBulk) Ignore() *SERPUpsertBulk {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWithIgnore())
+	return u
+}
+
+// DoNothing configures the conflict_action to `DO NOTHING`.
+// Supported only by SQLite and PostgreSQL.
+func (u *SERPUpsertBulk) DoNothing() *SERPUpsertBulk {
+	u.create.conflict = append(u.create.conflict, sql.DoNothing())
+	return u
+}
+
+// Update allows overriding fields `UPDATE` values. See the SERPCreateBulk.OnConflict
+// documentation for more info.
+func (u *SERPUpsertBulk) Update(set func(*SERPUpsert)) *SERPUpsertBulk {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWith(func(update *sql.UpdateSet) {
+		set(&SERPUpsert{UpdateSet: update})
+	}))
+	return u
+}
+
+// SetURL sets the "url" field.
+func (u *SERPUpsertBulk) SetURL(v string) *SERPUpsertBulk {
+	return u.Update(func(s *SERPUpsert) {
+		s.SetURL(v)
+	})
+}
+
+// UpdateURL sets the "url" field to the value that was provided on create.
+func (u *SERPUpsertBulk) UpdateURL() *SERPUpsertBulk {
+	return u.Update(func(s *SERPUpsert) {
+		s.UpdateURL()
+	})
+}
+
+// SetTitle sets the "title" field.
+func (u *SERPUpsertBulk) SetTitle(v string) *SERPUpsertBulk {
+	return u.Update(func(s *SERPUpsert) {
+		s.SetTitle(v)
+	})
+}
+
+// UpdateTitle sets the "title" field to the value that was provided on create.
+func (u *SERPUpsertBulk) UpdateTitle() *SERPUpsertBulk {
+	return u.Update(func(s *SERPUpsert) {
+		s.UpdateTitle()
+	})
+}
+
+// SetDescription sets the "description" field.
+func (u *SERPUpsertBulk) SetDescription(v string) *SERPUpsertBulk {
+	return u.Update(func(s *SERPUpsert) {
+		s.SetDescription(v)
+	})
+}
+
+// UpdateDescription sets the "description" field to the value that was provided on create.
+func (u *SERPUpsertBulk) UpdateDescription() *SERPUpsertBulk {
+	return u.Update(func(s *SERPUpsert) {
+		s.UpdateDescription()
+	})
+}
+
+// SetContactInfo sets the "contact_info" field.
+func (u *SERPUpsertBulk) SetContactInfo(v core.ContactInfo) *SERPUpsertBulk {
+	return u.Update(func(s *SERPUpsert) {
+		s.SetContactInfo(v)
+	})
+}
+
+// UpdateContactInfo sets the "contact_info" field to the value that was provided on create.
+func (u *SERPUpsertBulk) UpdateContactInfo() *SERPUpsertBulk {
+	return u.Update(func(s *SERPUpsert) {
+		s.UpdateContactInfo()
+	})
+}
+
+// ClearContactInfo clears the value of the "contact_info" field.
+func (u *SERPUpsertBulk) ClearContactInfo() *SERPUpsertBulk {
+	return u.Update(func(s *SERPUpsert) {
+		s.ClearContactInfo()
+	})
+}
+
+// SetKeyWords sets the "key_words" field.
+func (u *SERPUpsertBulk) SetKeyWords(v []string) *SERPUpsertBulk {
+	return u.Update(func(s *SERPUpsert) {
+		s.SetKeyWords(v)
+	})
+}
+
+// UpdateKeyWords sets the "key_words" field to the value that was provided on create.
+func (u *SERPUpsertBulk) UpdateKeyWords() *SERPUpsertBulk {
+	return u.Update(func(s *SERPUpsert) {
+		s.UpdateKeyWords()
+	})
+}
+
+// SetIsRead sets the "is_read" field.
+func (u *SERPUpsertBulk) SetIsRead(v bool) *SERPUpsertBulk {
+	return u.Update(func(s *SERPUpsert) {
+		s.SetIsRead(v)
+	})
+}
+
+// UpdateIsRead sets the "is_read" field to the value that was provided on create.
+func (u *SERPUpsertBulk) UpdateIsRead() *SERPUpsertBulk {
+	return u.Update(func(s *SERPUpsert) {
+		s.UpdateIsRead()
+	})
+}
+
+// SetSqID sets the "sq_id" field.
+func (u *SERPUpsertBulk) SetSqID(v int) *SERPUpsertBulk {
+	return u.Update(func(s *SERPUpsert) {
+		s.SetSqID(v)
+	})
+}
+
+// UpdateSqID sets the "sq_id" field to the value that was provided on create.
+func (u *SERPUpsertBulk) UpdateSqID() *SERPUpsertBulk {
+	return u.Update(func(s *SERPUpsert) {
+		s.UpdateSqID()
+	})
+}
+
+// ClearSqID clears the value of the "sq_id" field.
+func (u *SERPUpsertBulk) ClearSqID() *SERPUpsertBulk {
+	return u.Update(func(s *SERPUpsert) {
+		s.ClearSqID()
+	})
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (u *SERPUpsertBulk) SetCreatedAt(v time.Time) *SERPUpsertBulk {
+	return u.Update(func(s *SERPUpsert) {
+		s.SetCreatedAt(v)
+	})
+}
+
+// UpdateCreatedAt sets the "created_at" field to the value that was provided on create.
+func (u *SERPUpsertBulk) UpdateCreatedAt() *SERPUpsertBulk {
+	return u.Update(func(s *SERPUpsert) {
+		s.UpdateCreatedAt()
+	})
+}
+
+// Exec executes the query.
+func (u *SERPUpsertBulk) Exec(ctx context.Context) error {
+	if u.create.err != nil {
+		return u.create.err
+	}
+	for i, b := range u.create.builders {
+		if len(b.conflict) != 0 {
+			return fmt.Errorf("ent: OnConflict was set for builder %d. Set it on the SERPCreateBulk instead", i)
+		}
+	}
+	if len(u.create.conflict) == 0 {
+		return errors.New("ent: missing options for SERPCreateBulk.OnConflict")
+	}
+	return u.create.Exec(ctx)
+}
+
+// ExecX is like Exec, but panics if an error occurs.
+func (u *SERPUpsertBulk) ExecX(ctx context.Context) {
+	if err := u.create.Exec(ctx); err != nil {
 		panic(err)
 	}
 }

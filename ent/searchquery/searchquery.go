@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"entgo.io/ent/dialect/sql"
+	"entgo.io/ent/dialect/sql/sqlgraph"
 )
 
 const (
@@ -19,10 +20,21 @@ const (
 	FieldLocation = "location"
 	// FieldLanguage holds the string denoting the language field in the database.
 	FieldLanguage = "language"
+	// FieldIsCanceled holds the string denoting the is_canceled field in the database.
+	FieldIsCanceled = "is_canceled"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
 	FieldCreatedAt = "created_at"
+	// EdgeSerps holds the string denoting the serps edge name in mutations.
+	EdgeSerps = "serps"
 	// Table holds the table name of the searchquery in the database.
-	Table = "search_query"
+	Table = "search_queries"
+	// SerpsTable is the table that holds the serps relation/edge.
+	SerpsTable = "serps"
+	// SerpsInverseTable is the table name for the SERP entity.
+	// It exists in this package in order to avoid circular dependency with the "serp" package.
+	SerpsInverseTable = "serps"
+	// SerpsColumn is the table column denoting the serps relation/edge.
+	SerpsColumn = "sq_id"
 )
 
 // Columns holds all SQL columns for searchquery fields.
@@ -31,6 +43,7 @@ var Columns = []string{
 	FieldQuery,
 	FieldLocation,
 	FieldLanguage,
+	FieldIsCanceled,
 	FieldCreatedAt,
 }
 
@@ -47,6 +60,8 @@ func ValidColumn(column string) bool {
 var (
 	// QueryValidator is a validator for the "query" field. It is called by the builders before save.
 	QueryValidator func(string) error
+	// DefaultIsCanceled holds the default value on creation for the "is_canceled" field.
+	DefaultIsCanceled bool
 	// DefaultCreatedAt holds the default value on creation for the "created_at" field.
 	DefaultCreatedAt func() time.Time
 )
@@ -74,7 +89,33 @@ func ByLanguage(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldLanguage, opts...).ToFunc()
 }
 
+// ByIsCanceled orders the results by the is_canceled field.
+func ByIsCanceled(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldIsCanceled, opts...).ToFunc()
+}
+
 // ByCreatedAt orders the results by the created_at field.
 func ByCreatedAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldCreatedAt, opts...).ToFunc()
+}
+
+// BySerpsCount orders the results by serps count.
+func BySerpsCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newSerpsStep(), opts...)
+	}
+}
+
+// BySerps orders the results by serps terms.
+func BySerps(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newSerpsStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+func newSerpsStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(SerpsInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, SerpsTable, SerpsColumn),
+	)
 }

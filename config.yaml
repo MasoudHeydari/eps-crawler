@@ -3,7 +3,7 @@ app:
   port: 7000
   debug: false
   verbose: true
-  timeout: 60
+  timeout: 600
   head: false
   leakless: false
 

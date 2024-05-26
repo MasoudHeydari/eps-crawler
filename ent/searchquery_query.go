@@ -4,6 +4,7 @@ package ent
 
 import (
 	"context"
+	"database/sql/driver"
 	"fmt"
 	"math"
 
@@ -12,6 +13,7 @@ import (
 	"entgo.io/ent/schema/field"
 	"github.com/karust/openserp/ent/predicate"
 	"github.com/karust/openserp/ent/searchquery"
+	"github.com/karust/openserp/ent/serp"
 )
 
 // SearchQueryQuery is the builder for querying SearchQuery entities.
@@ -21,6 +23,7 @@ type SearchQueryQuery struct {
 	order      []searchquery.OrderOption
 	inters     []Interceptor
 	predicates []predicate.SearchQuery
+	withSerps  *SERPQuery
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -55,6 +58,28 @@ func (sqq *SearchQueryQuery) Unique(unique bool) *SearchQueryQuery {
 func (sqq *SearchQueryQuery) Order(o ...searchquery.OrderOption) *SearchQueryQuery {
 	sqq.order = append(sqq.order, o...)
 	return sqq
+}
+
+// QuerySerps chains the current query on the "serps" edge.
+func (sqq *SearchQueryQuery) QuerySerps() *SERPQuery {
+	query := (&SERPClient{config: sqq.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := sqq.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := sqq.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(searchquery.Table, searchquery.FieldID, selector),
+			sqlgraph.To(serp.Table, serp.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, searchquery.SerpsTable, searchquery.SerpsColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(sqq.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
 }
 
 // First returns the first SearchQuery entity from the query.
@@ -249,10 +274,22 @@ func (sqq *SearchQueryQuery) Clone() *SearchQueryQuery {
 		order:      append([]searchquery.OrderOption{}, sqq.order...),
 		inters:     append([]Interceptor{}, sqq.inters...),
 		predicates: append([]predicate.SearchQuery{}, sqq.predicates...),
+		withSerps:  sqq.withSerps.Clone(),
 		// clone intermediate query.
 		sql:  sqq.sql.Clone(),
 		path: sqq.path,
 	}
+}
+
+// WithSerps tells the query-builder to eager-load the nodes that are connected to
+// the "serps" edge. The optional arguments are used to configure the query builder of the edge.
+func (sqq *SearchQueryQuery) WithSerps(opts ...func(*SERPQuery)) *SearchQueryQuery {
+	query := (&SERPClient{config: sqq.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	sqq.withSerps = query
+	return sqq
 }
 
 // GroupBy is used to group vertices by one or more fields/columns.
@@ -331,8 +368,11 @@ func (sqq *SearchQueryQuery) prepareQuery(ctx context.Context) error {
 
 func (sqq *SearchQueryQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*SearchQuery, error) {
 	var (
-		nodes = []*SearchQuery{}
-		_spec = sqq.querySpec()
+		nodes       = []*SearchQuery{}
+		_spec       = sqq.querySpec()
+		loadedTypes = [1]bool{
+			sqq.withSerps != nil,
+		}
 	)
 	_spec.ScanValues = func(columns []string) ([]any, error) {
 		return (*SearchQuery).scanValues(nil, columns)
@@ -340,6 +380,7 @@ func (sqq *SearchQueryQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]
 	_spec.Assign = func(columns []string, values []any) error {
 		node := &SearchQuery{config: sqq.config}
 		nodes = append(nodes, node)
+		node.Edges.loadedTypes = loadedTypes
 		return node.assignValues(columns, values)
 	}
 	for i := range hooks {
@@ -351,7 +392,45 @@ func (sqq *SearchQueryQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]
 	if len(nodes) == 0 {
 		return nodes, nil
 	}
+	if query := sqq.withSerps; query != nil {
+		if err := sqq.loadSerps(ctx, query, nodes,
+			func(n *SearchQuery) { n.Edges.Serps = []*SERP{} },
+			func(n *SearchQuery, e *SERP) { n.Edges.Serps = append(n.Edges.Serps, e) }); err != nil {
+			return nil, err
+		}
+	}
 	return nodes, nil
+}
+
+func (sqq *SearchQueryQuery) loadSerps(ctx context.Context, query *SERPQuery, nodes []*SearchQuery, init func(*SearchQuery), assign func(*SearchQuery, *SERP)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int]*SearchQuery)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(serp.FieldSqID)
+	}
+	query.Where(predicate.SERP(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(searchquery.SerpsColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.SqID
+		node, ok := nodeids[fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "sq_id" returned %v for node %v`, fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
 }
 
 func (sqq *SearchQueryQuery) sqlCount(ctx context.Context) (int, error) {

@@ -12,10 +12,12 @@ var ErrCaptcha = errors.New("Captcha detected")
 var ErrSearchTimeout = errors.New("Timeout. Cannot find element on page")
 
 type SearchResult struct {
-	Rank        int    `json:"rank"`
-	URL         string `json:"url"`
-	Title       string `json:"title"`
-	Description string `json:"description"`
+	Rank        int          `json:"rank"`
+	URL         string       `json:"url"`
+	Title       string       `json:"title"`
+	ContactInfo *ContactInfo `json:"contact_info"`
+	KeyWords    []string     `json:"key_words"`
+	Description string       `json:"description"`
 }
 
 type Query struct {

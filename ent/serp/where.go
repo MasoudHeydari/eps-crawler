@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"entgo.io/ent/dialect/sql"
+	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/karust/openserp/ent/predicate"
 )
 
@@ -72,6 +73,11 @@ func Description(v string) predicate.SERP {
 // IsRead applies equality check predicate on the "is_read" field. It's identical to IsReadEQ.
 func IsRead(v bool) predicate.SERP {
 	return predicate.SERP(sql.FieldEQ(FieldIsRead, v))
+}
+
+// SqID applies equality check predicate on the "sq_id" field. It's identical to SqIDEQ.
+func SqID(v int) predicate.SERP {
+	return predicate.SERP(sql.FieldEQ(FieldSqID, v))
 }
 
 // CreatedAt applies equality check predicate on the "created_at" field. It's identical to CreatedAtEQ.
@@ -294,6 +300,36 @@ func IsReadNEQ(v bool) predicate.SERP {
 	return predicate.SERP(sql.FieldNEQ(FieldIsRead, v))
 }
 
+// SqIDEQ applies the EQ predicate on the "sq_id" field.
+func SqIDEQ(v int) predicate.SERP {
+	return predicate.SERP(sql.FieldEQ(FieldSqID, v))
+}
+
+// SqIDNEQ applies the NEQ predicate on the "sq_id" field.
+func SqIDNEQ(v int) predicate.SERP {
+	return predicate.SERP(sql.FieldNEQ(FieldSqID, v))
+}
+
+// SqIDIn applies the In predicate on the "sq_id" field.
+func SqIDIn(vs ...int) predicate.SERP {
+	return predicate.SERP(sql.FieldIn(FieldSqID, vs...))
+}
+
+// SqIDNotIn applies the NotIn predicate on the "sq_id" field.
+func SqIDNotIn(vs ...int) predicate.SERP {
+	return predicate.SERP(sql.FieldNotIn(FieldSqID, vs...))
+}
+
+// SqIDIsNil applies the IsNil predicate on the "sq_id" field.
+func SqIDIsNil() predicate.SERP {
+	return predicate.SERP(sql.FieldIsNull(FieldSqID))
+}
+
+// SqIDNotNil applies the NotNil predicate on the "sq_id" field.
+func SqIDNotNil() predicate.SERP {
+	return predicate.SERP(sql.FieldNotNull(FieldSqID))
+}
+
 // CreatedAtEQ applies the EQ predicate on the "created_at" field.
 func CreatedAtEQ(v time.Time) predicate.SERP {
 	return predicate.SERP(sql.FieldEQ(FieldCreatedAt, v))
@@ -332,6 +368,29 @@ func CreatedAtLT(v time.Time) predicate.SERP {
 // CreatedAtLTE applies the LTE predicate on the "created_at" field.
 func CreatedAtLTE(v time.Time) predicate.SERP {
 	return predicate.SERP(sql.FieldLTE(FieldCreatedAt, v))
+}
+
+// HasSearchQuery applies the HasEdge predicate on the "search_query" edge.
+func HasSearchQuery() predicate.SERP {
+	return predicate.SERP(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, SearchQueryTable, SearchQueryColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasSearchQueryWith applies the HasEdge predicate on the "search_query" edge with a given conditions (other predicates).
+func HasSearchQueryWith(preds ...predicate.SearchQuery) predicate.SERP {
+	return predicate.SERP(func(s *sql.Selector) {
+		step := newSearchQueryStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
 }
 
 // And groups predicates with the AND operator between them.

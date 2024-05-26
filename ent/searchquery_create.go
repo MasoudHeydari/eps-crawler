@@ -8,9 +8,11 @@ import (
 	"fmt"
 	"time"
 
+	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/karust/openserp/ent/searchquery"
+	"github.com/karust/openserp/ent/serp"
 )
 
 // SearchQueryCreate is the builder for creating a SearchQuery entity.
@@ -18,6 +20,7 @@ type SearchQueryCreate struct {
 	config
 	mutation *SearchQueryMutation
 	hooks    []Hook
+	conflict []sql.ConflictOption
 }
 
 // SetQuery sets the "query" field.
@@ -38,6 +41,20 @@ func (sqc *SearchQueryCreate) SetLanguage(s string) *SearchQueryCreate {
 	return sqc
 }
 
+// SetIsCanceled sets the "is_canceled" field.
+func (sqc *SearchQueryCreate) SetIsCanceled(b bool) *SearchQueryCreate {
+	sqc.mutation.SetIsCanceled(b)
+	return sqc
+}
+
+// SetNillableIsCanceled sets the "is_canceled" field if the given value is not nil.
+func (sqc *SearchQueryCreate) SetNillableIsCanceled(b *bool) *SearchQueryCreate {
+	if b != nil {
+		sqc.SetIsCanceled(*b)
+	}
+	return sqc
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (sqc *SearchQueryCreate) SetCreatedAt(t time.Time) *SearchQueryCreate {
 	sqc.mutation.SetCreatedAt(t)
@@ -50,6 +67,21 @@ func (sqc *SearchQueryCreate) SetNillableCreatedAt(t *time.Time) *SearchQueryCre
 		sqc.SetCreatedAt(*t)
 	}
 	return sqc
+}
+
+// AddSerpIDs adds the "serps" edge to the SERP entity by IDs.
+func (sqc *SearchQueryCreate) AddSerpIDs(ids ...int) *SearchQueryCreate {
+	sqc.mutation.AddSerpIDs(ids...)
+	return sqc
+}
+
+// AddSerps adds the "serps" edges to the SERP entity.
+func (sqc *SearchQueryCreate) AddSerps(s ...*SERP) *SearchQueryCreate {
+	ids := make([]int, len(s))
+	for i := range s {
+		ids[i] = s[i].ID
+	}
+	return sqc.AddSerpIDs(ids...)
 }
 
 // Mutation returns the SearchQueryMutation object of the builder.
@@ -87,6 +119,10 @@ func (sqc *SearchQueryCreate) ExecX(ctx context.Context) {
 
 // defaults sets the default values of the builder before save.
 func (sqc *SearchQueryCreate) defaults() {
+	if _, ok := sqc.mutation.IsCanceled(); !ok {
+		v := searchquery.DefaultIsCanceled
+		sqc.mutation.SetIsCanceled(v)
+	}
 	if _, ok := sqc.mutation.CreatedAt(); !ok {
 		v := searchquery.DefaultCreatedAt()
 		sqc.mutation.SetCreatedAt(v)
@@ -108,6 +144,9 @@ func (sqc *SearchQueryCreate) check() error {
 	}
 	if _, ok := sqc.mutation.Language(); !ok {
 		return &ValidationError{Name: "language", err: errors.New(`ent: missing required field "SearchQuery.language"`)}
+	}
+	if _, ok := sqc.mutation.IsCanceled(); !ok {
+		return &ValidationError{Name: "is_canceled", err: errors.New(`ent: missing required field "SearchQuery.is_canceled"`)}
 	}
 	if _, ok := sqc.mutation.CreatedAt(); !ok {
 		return &ValidationError{Name: "created_at", err: errors.New(`ent: missing required field "SearchQuery.created_at"`)}
@@ -138,6 +177,7 @@ func (sqc *SearchQueryCreate) createSpec() (*SearchQuery, *sqlgraph.CreateSpec) 
 		_node = &SearchQuery{config: sqc.config}
 		_spec = sqlgraph.NewCreateSpec(searchquery.Table, sqlgraph.NewFieldSpec(searchquery.FieldID, field.TypeInt))
 	)
+	_spec.OnConflict = sqc.conflict
 	if value, ok := sqc.mutation.Query(); ok {
 		_spec.SetField(searchquery.FieldQuery, field.TypeString, value)
 		_node.Query = value
@@ -150,11 +190,283 @@ func (sqc *SearchQueryCreate) createSpec() (*SearchQuery, *sqlgraph.CreateSpec) 
 		_spec.SetField(searchquery.FieldLanguage, field.TypeString, value)
 		_node.Language = value
 	}
+	if value, ok := sqc.mutation.IsCanceled(); ok {
+		_spec.SetField(searchquery.FieldIsCanceled, field.TypeBool, value)
+		_node.IsCanceled = value
+	}
 	if value, ok := sqc.mutation.CreatedAt(); ok {
 		_spec.SetField(searchquery.FieldCreatedAt, field.TypeTime, value)
 		_node.CreatedAt = value
 	}
+	if nodes := sqc.mutation.SerpsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   searchquery.SerpsTable,
+			Columns: []string{searchquery.SerpsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(serp.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
 	return _node, _spec
+}
+
+// OnConflict allows configuring the `ON CONFLICT` / `ON DUPLICATE KEY` clause
+// of the `INSERT` statement. For example:
+//
+//	client.SearchQuery.Create().
+//		SetQuery(v).
+//		OnConflict(
+//			// Update the row with the new values
+//			// the was proposed for insertion.
+//			sql.ResolveWithNewValues(),
+//		).
+//		// Override some of the fields with custom
+//		// update values.
+//		Update(func(u *ent.SearchQueryUpsert) {
+//			SetQuery(v+v).
+//		}).
+//		Exec(ctx)
+func (sqc *SearchQueryCreate) OnConflict(opts ...sql.ConflictOption) *SearchQueryUpsertOne {
+	sqc.conflict = opts
+	return &SearchQueryUpsertOne{
+		create: sqc,
+	}
+}
+
+// OnConflictColumns calls `OnConflict` and configures the columns
+// as conflict target. Using this option is equivalent to using:
+//
+//	client.SearchQuery.Create().
+//		OnConflict(sql.ConflictColumns(columns...)).
+//		Exec(ctx)
+func (sqc *SearchQueryCreate) OnConflictColumns(columns ...string) *SearchQueryUpsertOne {
+	sqc.conflict = append(sqc.conflict, sql.ConflictColumns(columns...))
+	return &SearchQueryUpsertOne{
+		create: sqc,
+	}
+}
+
+type (
+	// SearchQueryUpsertOne is the builder for "upsert"-ing
+	//  one SearchQuery node.
+	SearchQueryUpsertOne struct {
+		create *SearchQueryCreate
+	}
+
+	// SearchQueryUpsert is the "OnConflict" setter.
+	SearchQueryUpsert struct {
+		*sql.UpdateSet
+	}
+)
+
+// SetQuery sets the "query" field.
+func (u *SearchQueryUpsert) SetQuery(v string) *SearchQueryUpsert {
+	u.Set(searchquery.FieldQuery, v)
+	return u
+}
+
+// UpdateQuery sets the "query" field to the value that was provided on create.
+func (u *SearchQueryUpsert) UpdateQuery() *SearchQueryUpsert {
+	u.SetExcluded(searchquery.FieldQuery)
+	return u
+}
+
+// SetLocation sets the "location" field.
+func (u *SearchQueryUpsert) SetLocation(v string) *SearchQueryUpsert {
+	u.Set(searchquery.FieldLocation, v)
+	return u
+}
+
+// UpdateLocation sets the "location" field to the value that was provided on create.
+func (u *SearchQueryUpsert) UpdateLocation() *SearchQueryUpsert {
+	u.SetExcluded(searchquery.FieldLocation)
+	return u
+}
+
+// SetLanguage sets the "language" field.
+func (u *SearchQueryUpsert) SetLanguage(v string) *SearchQueryUpsert {
+	u.Set(searchquery.FieldLanguage, v)
+	return u
+}
+
+// UpdateLanguage sets the "language" field to the value that was provided on create.
+func (u *SearchQueryUpsert) UpdateLanguage() *SearchQueryUpsert {
+	u.SetExcluded(searchquery.FieldLanguage)
+	return u
+}
+
+// SetIsCanceled sets the "is_canceled" field.
+func (u *SearchQueryUpsert) SetIsCanceled(v bool) *SearchQueryUpsert {
+	u.Set(searchquery.FieldIsCanceled, v)
+	return u
+}
+
+// UpdateIsCanceled sets the "is_canceled" field to the value that was provided on create.
+func (u *SearchQueryUpsert) UpdateIsCanceled() *SearchQueryUpsert {
+	u.SetExcluded(searchquery.FieldIsCanceled)
+	return u
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (u *SearchQueryUpsert) SetCreatedAt(v time.Time) *SearchQueryUpsert {
+	u.Set(searchquery.FieldCreatedAt, v)
+	return u
+}
+
+// UpdateCreatedAt sets the "created_at" field to the value that was provided on create.
+func (u *SearchQueryUpsert) UpdateCreatedAt() *SearchQueryUpsert {
+	u.SetExcluded(searchquery.FieldCreatedAt)
+	return u
+}
+
+// UpdateNewValues updates the mutable fields using the new values that were set on create.
+// Using this option is equivalent to using:
+//
+//	client.SearchQuery.Create().
+//		OnConflict(
+//			sql.ResolveWithNewValues(),
+//		).
+//		Exec(ctx)
+func (u *SearchQueryUpsertOne) UpdateNewValues() *SearchQueryUpsertOne {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWithNewValues())
+	return u
+}
+
+// Ignore sets each column to itself in case of conflict.
+// Using this option is equivalent to using:
+//
+//	client.SearchQuery.Create().
+//	    OnConflict(sql.ResolveWithIgnore()).
+//	    Exec(ctx)
+func (u *SearchQueryUpsertOne) Ignore() *SearchQueryUpsertOne {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWithIgnore())
+	return u
+}
+
+// DoNothing configures the conflict_action to `DO NOTHING`.
+// Supported only by SQLite and PostgreSQL.
+func (u *SearchQueryUpsertOne) DoNothing() *SearchQueryUpsertOne {
+	u.create.conflict = append(u.create.conflict, sql.DoNothing())
+	return u
+}
+
+// Update allows overriding fields `UPDATE` values. See the SearchQueryCreate.OnConflict
+// documentation for more info.
+func (u *SearchQueryUpsertOne) Update(set func(*SearchQueryUpsert)) *SearchQueryUpsertOne {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWith(func(update *sql.UpdateSet) {
+		set(&SearchQueryUpsert{UpdateSet: update})
+	}))
+	return u
+}
+
+// SetQuery sets the "query" field.
+func (u *SearchQueryUpsertOne) SetQuery(v string) *SearchQueryUpsertOne {
+	return u.Update(func(s *SearchQueryUpsert) {
+		s.SetQuery(v)
+	})
+}
+
+// UpdateQuery sets the "query" field to the value that was provided on create.
+func (u *SearchQueryUpsertOne) UpdateQuery() *SearchQueryUpsertOne {
+	return u.Update(func(s *SearchQueryUpsert) {
+		s.UpdateQuery()
+	})
+}
+
+// SetLocation sets the "location" field.
+func (u *SearchQueryUpsertOne) SetLocation(v string) *SearchQueryUpsertOne {
+	return u.Update(func(s *SearchQueryUpsert) {
+		s.SetLocation(v)
+	})
+}
+
+// UpdateLocation sets the "location" field to the value that was provided on create.
+func (u *SearchQueryUpsertOne) UpdateLocation() *SearchQueryUpsertOne {
+	return u.Update(func(s *SearchQueryUpsert) {
+		s.UpdateLocation()
+	})
+}
+
+// SetLanguage sets the "language" field.
+func (u *SearchQueryUpsertOne) SetLanguage(v string) *SearchQueryUpsertOne {
+	return u.Update(func(s *SearchQueryUpsert) {
+		s.SetLanguage(v)
+	})
+}
+
+// UpdateLanguage sets the "language" field to the value that was provided on create.
+func (u *SearchQueryUpsertOne) UpdateLanguage() *SearchQueryUpsertOne {
+	return u.Update(func(s *SearchQueryUpsert) {
+		s.UpdateLanguage()
+	})
+}
+
+// SetIsCanceled sets the "is_canceled" field.
+func (u *SearchQueryUpsertOne) SetIsCanceled(v bool) *SearchQueryUpsertOne {
+	return u.Update(func(s *SearchQueryUpsert) {
+		s.SetIsCanceled(v)
+	})
+}
+
+// UpdateIsCanceled sets the "is_canceled" field to the value that was provided on create.
+func (u *SearchQueryUpsertOne) UpdateIsCanceled() *SearchQueryUpsertOne {
+	return u.Update(func(s *SearchQueryUpsert) {
+		s.UpdateIsCanceled()
+	})
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (u *SearchQueryUpsertOne) SetCreatedAt(v time.Time) *SearchQueryUpsertOne {
+	return u.Update(func(s *SearchQueryUpsert) {
+		s.SetCreatedAt(v)
+	})
+}
+
+// UpdateCreatedAt sets the "created_at" field to the value that was provided on create.
+func (u *SearchQueryUpsertOne) UpdateCreatedAt() *SearchQueryUpsertOne {
+	return u.Update(func(s *SearchQueryUpsert) {
+		s.UpdateCreatedAt()
+	})
+}
+
+// Exec executes the query.
+func (u *SearchQueryUpsertOne) Exec(ctx context.Context) error {
+	if len(u.create.conflict) == 0 {
+		return errors.New("ent: missing options for SearchQueryCreate.OnConflict")
+	}
+	return u.create.Exec(ctx)
+}
+
+// ExecX is like Exec, but panics if an error occurs.
+func (u *SearchQueryUpsertOne) ExecX(ctx context.Context) {
+	if err := u.create.Exec(ctx); err != nil {
+		panic(err)
+	}
+}
+
+// Exec executes the UPSERT query and returns the inserted/updated ID.
+func (u *SearchQueryUpsertOne) ID(ctx context.Context) (id int, err error) {
+	node, err := u.create.Save(ctx)
+	if err != nil {
+		return id, err
+	}
+	return node.ID, nil
+}
+
+// IDX is like ID, but panics if an error occurs.
+func (u *SearchQueryUpsertOne) IDX(ctx context.Context) int {
+	id, err := u.ID(ctx)
+	if err != nil {
+		panic(err)
+	}
+	return id
 }
 
 // SearchQueryCreateBulk is the builder for creating many SearchQuery entities in bulk.
@@ -162,6 +474,7 @@ type SearchQueryCreateBulk struct {
 	config
 	err      error
 	builders []*SearchQueryCreate
+	conflict []sql.ConflictOption
 }
 
 // Save creates the SearchQuery entities in the database.
@@ -191,6 +504,7 @@ func (sqcb *SearchQueryCreateBulk) Save(ctx context.Context) ([]*SearchQuery, er
 					_, err = mutators[i+1].Mutate(root, sqcb.builders[i+1].mutation)
 				} else {
 					spec := &sqlgraph.BatchCreateSpec{Nodes: specs}
+					spec.OnConflict = sqcb.conflict
 					// Invoke the actual operation on the latest mutation in the chain.
 					if err = sqlgraph.BatchCreate(ctx, sqcb.driver, spec); err != nil {
 						if sqlgraph.IsConstraintError(err) {
@@ -241,6 +555,180 @@ func (sqcb *SearchQueryCreateBulk) Exec(ctx context.Context) error {
 // ExecX is like Exec, but panics if an error occurs.
 func (sqcb *SearchQueryCreateBulk) ExecX(ctx context.Context) {
 	if err := sqcb.Exec(ctx); err != nil {
+		panic(err)
+	}
+}
+
+// OnConflict allows configuring the `ON CONFLICT` / `ON DUPLICATE KEY` clause
+// of the `INSERT` statement. For example:
+//
+//	client.SearchQuery.CreateBulk(builders...).
+//		OnConflict(
+//			// Update the row with the new values
+//			// the was proposed for insertion.
+//			sql.ResolveWithNewValues(),
+//		).
+//		// Override some of the fields with custom
+//		// update values.
+//		Update(func(u *ent.SearchQueryUpsert) {
+//			SetQuery(v+v).
+//		}).
+//		Exec(ctx)
+func (sqcb *SearchQueryCreateBulk) OnConflict(opts ...sql.ConflictOption) *SearchQueryUpsertBulk {
+	sqcb.conflict = opts
+	return &SearchQueryUpsertBulk{
+		create: sqcb,
+	}
+}
+
+// OnConflictColumns calls `OnConflict` and configures the columns
+// as conflict target. Using this option is equivalent to using:
+//
+//	client.SearchQuery.Create().
+//		OnConflict(sql.ConflictColumns(columns...)).
+//		Exec(ctx)
+func (sqcb *SearchQueryCreateBulk) OnConflictColumns(columns ...string) *SearchQueryUpsertBulk {
+	sqcb.conflict = append(sqcb.conflict, sql.ConflictColumns(columns...))
+	return &SearchQueryUpsertBulk{
+		create: sqcb,
+	}
+}
+
+// SearchQueryUpsertBulk is the builder for "upsert"-ing
+// a bulk of SearchQuery nodes.
+type SearchQueryUpsertBulk struct {
+	create *SearchQueryCreateBulk
+}
+
+// UpdateNewValues updates the mutable fields using the new values that
+// were set on create. Using this option is equivalent to using:
+//
+//	client.SearchQuery.Create().
+//		OnConflict(
+//			sql.ResolveWithNewValues(),
+//		).
+//		Exec(ctx)
+func (u *SearchQueryUpsertBulk) UpdateNewValues() *SearchQueryUpsertBulk {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWithNewValues())
+	return u
+}
+
+// Ignore sets each column to itself in case of conflict.
+// Using this option is equivalent to using:
+//
+//	client.SearchQuery.Create().
+//		OnConflict(sql.ResolveWithIgnore()).
+//		Exec(ctx)
+func (u *SearchQueryUpsertBulk) Ignore() *SearchQueryUpsertBulk {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWithIgnore())
+	return u
+}
+
+// DoNothing configures the conflict_action to `DO NOTHING`.
+// Supported only by SQLite and PostgreSQL.
+func (u *SearchQueryUpsertBulk) DoNothing() *SearchQueryUpsertBulk {
+	u.create.conflict = append(u.create.conflict, sql.DoNothing())
+	return u
+}
+
+// Update allows overriding fields `UPDATE` values. See the SearchQueryCreateBulk.OnConflict
+// documentation for more info.
+func (u *SearchQueryUpsertBulk) Update(set func(*SearchQueryUpsert)) *SearchQueryUpsertBulk {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWith(func(update *sql.UpdateSet) {
+		set(&SearchQueryUpsert{UpdateSet: update})
+	}))
+	return u
+}
+
+// SetQuery sets the "query" field.
+func (u *SearchQueryUpsertBulk) SetQuery(v string) *SearchQueryUpsertBulk {
+	return u.Update(func(s *SearchQueryUpsert) {
+		s.SetQuery(v)
+	})
+}
+
+// UpdateQuery sets the "query" field to the value that was provided on create.
+func (u *SearchQueryUpsertBulk) UpdateQuery() *SearchQueryUpsertBulk {
+	return u.Update(func(s *SearchQueryUpsert) {
+		s.UpdateQuery()
+	})
+}
+
+// SetLocation sets the "location" field.
+func (u *SearchQueryUpsertBulk) SetLocation(v string) *SearchQueryUpsertBulk {
+	return u.Update(func(s *SearchQueryUpsert) {
+		s.SetLocation(v)
+	})
+}
+
+// UpdateLocation sets the "location" field to the value that was provided on create.
+func (u *SearchQueryUpsertBulk) UpdateLocation() *SearchQueryUpsertBulk {
+	return u.Update(func(s *SearchQueryUpsert) {
+		s.UpdateLocation()
+	})
+}
+
+// SetLanguage sets the "language" field.
+func (u *SearchQueryUpsertBulk) SetLanguage(v string) *SearchQueryUpsertBulk {
+	return u.Update(func(s *SearchQueryUpsert) {
+		s.SetLanguage(v)
+	})
+}
+
+// UpdateLanguage sets the "language" field to the value that was provided on create.
+func (u *SearchQueryUpsertBulk) UpdateLanguage() *SearchQueryUpsertBulk {
+	return u.Update(func(s *SearchQueryUpsert) {
+		s.UpdateLanguage()
+	})
+}
+
+// SetIsCanceled sets the "is_canceled" field.
+func (u *SearchQueryUpsertBulk) SetIsCanceled(v bool) *SearchQueryUpsertBulk {
+	return u.Update(func(s *SearchQueryUpsert) {
+		s.SetIsCanceled(v)
+	})
+}
+
+// UpdateIsCanceled sets the "is_canceled" field to the value that was provided on create.
+func (u *SearchQueryUpsertBulk) UpdateIsCanceled() *SearchQueryUpsertBulk {
+	return u.Update(func(s *SearchQueryUpsert) {
+		s.UpdateIsCanceled()
+	})
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (u *SearchQueryUpsertBulk) SetCreatedAt(v time.Time) *SearchQueryUpsertBulk {
+	return u.Update(func(s *SearchQueryUpsert) {
+		s.SetCreatedAt(v)
+	})
+}
+
+// UpdateCreatedAt sets the "created_at" field to the value that was provided on create.
+func (u *SearchQueryUpsertBulk) UpdateCreatedAt() *SearchQueryUpsertBulk {
+	return u.Update(func(s *SearchQueryUpsert) {
+		s.UpdateCreatedAt()
+	})
+}
+
+// Exec executes the query.
+func (u *SearchQueryUpsertBulk) Exec(ctx context.Context) error {
+	if u.create.err != nil {
+		return u.create.err
+	}
+	for i, b := range u.create.builders {
+		if len(b.conflict) != 0 {
+			return fmt.Errorf("ent: OnConflict was set for builder %d. Set it on the SearchQueryCreateBulk instead", i)
+		}
+	}
+	if len(u.create.conflict) == 0 {
+		return errors.New("ent: missing options for SearchQueryCreateBulk.OnConflict")
+	}
+	return u.create.Exec(ctx)
+}
+
+// ExecX is like Exec, but panics if an error occurs.
+func (u *SearchQueryUpsertBulk) ExecX(ctx context.Context) {
+	if err := u.create.Exec(ctx); err != nil {
 		panic(err)
 	}
 }

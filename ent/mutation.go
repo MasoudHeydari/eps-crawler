@@ -33,21 +33,23 @@ const (
 // SERPMutation represents an operation that mutates the SERP nodes in the graph.
 type SERPMutation struct {
 	config
-	op              Op
-	typ             string
-	id              *int
-	url             *string
-	title           *string
-	description     *string
-	contact_info    *core.ContactInfo
-	key_words       *[]string
-	appendkey_words []string
-	is_read         *bool
-	created_at      *time.Time
-	clearedFields   map[string]struct{}
-	done            bool
-	oldValue        func(context.Context) (*SERP, error)
-	predicates      []predicate.SERP
+	op                  Op
+	typ                 string
+	id                  *int
+	url                 *string
+	title               *string
+	description         *string
+	contact_info        *core.ContactInfo
+	key_words           *[]string
+	appendkey_words     []string
+	is_read             *bool
+	created_at          *time.Time
+	clearedFields       map[string]struct{}
+	search_query        *int
+	clearedsearch_query bool
+	done                bool
+	oldValue            func(context.Context) (*SERP, error)
+	predicates          []predicate.SERP
 }
 
 var _ ent.Mutation = (*SERPMutation)(nil)
@@ -392,6 +394,55 @@ func (m *SERPMutation) ResetIsRead() {
 	m.is_read = nil
 }
 
+// SetSqID sets the "sq_id" field.
+func (m *SERPMutation) SetSqID(i int) {
+	m.search_query = &i
+}
+
+// SqID returns the value of the "sq_id" field in the mutation.
+func (m *SERPMutation) SqID() (r int, exists bool) {
+	v := m.search_query
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSqID returns the old "sq_id" field's value of the SERP entity.
+// If the SERP object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SERPMutation) OldSqID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSqID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSqID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSqID: %w", err)
+	}
+	return oldValue.SqID, nil
+}
+
+// ClearSqID clears the value of the "sq_id" field.
+func (m *SERPMutation) ClearSqID() {
+	m.search_query = nil
+	m.clearedFields[serp.FieldSqID] = struct{}{}
+}
+
+// SqIDCleared returns if the "sq_id" field was cleared in this mutation.
+func (m *SERPMutation) SqIDCleared() bool {
+	_, ok := m.clearedFields[serp.FieldSqID]
+	return ok
+}
+
+// ResetSqID resets all changes to the "sq_id" field.
+func (m *SERPMutation) ResetSqID() {
+	m.search_query = nil
+	delete(m.clearedFields, serp.FieldSqID)
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (m *SERPMutation) SetCreatedAt(t time.Time) {
 	m.created_at = &t
@@ -428,6 +479,46 @@ func (m *SERPMutation) ResetCreatedAt() {
 	m.created_at = nil
 }
 
+// SetSearchQueryID sets the "search_query" edge to the SearchQuery entity by id.
+func (m *SERPMutation) SetSearchQueryID(id int) {
+	m.search_query = &id
+}
+
+// ClearSearchQuery clears the "search_query" edge to the SearchQuery entity.
+func (m *SERPMutation) ClearSearchQuery() {
+	m.clearedsearch_query = true
+	m.clearedFields[serp.FieldSqID] = struct{}{}
+}
+
+// SearchQueryCleared reports if the "search_query" edge to the SearchQuery entity was cleared.
+func (m *SERPMutation) SearchQueryCleared() bool {
+	return m.SqIDCleared() || m.clearedsearch_query
+}
+
+// SearchQueryID returns the "search_query" edge ID in the mutation.
+func (m *SERPMutation) SearchQueryID() (id int, exists bool) {
+	if m.search_query != nil {
+		return *m.search_query, true
+	}
+	return
+}
+
+// SearchQueryIDs returns the "search_query" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// SearchQueryID instead. It exists only for internal usage by the builders.
+func (m *SERPMutation) SearchQueryIDs() (ids []int) {
+	if id := m.search_query; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetSearchQuery resets all changes to the "search_query" edge.
+func (m *SERPMutation) ResetSearchQuery() {
+	m.search_query = nil
+	m.clearedsearch_query = false
+}
+
 // Where appends a list predicates to the SERPMutation builder.
 func (m *SERPMutation) Where(ps ...predicate.SERP) {
 	m.predicates = append(m.predicates, ps...)
@@ -462,7 +553,7 @@ func (m *SERPMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *SERPMutation) Fields() []string {
-	fields := make([]string, 0, 7)
+	fields := make([]string, 0, 8)
 	if m.url != nil {
 		fields = append(fields, serp.FieldURL)
 	}
@@ -480,6 +571,9 @@ func (m *SERPMutation) Fields() []string {
 	}
 	if m.is_read != nil {
 		fields = append(fields, serp.FieldIsRead)
+	}
+	if m.search_query != nil {
+		fields = append(fields, serp.FieldSqID)
 	}
 	if m.created_at != nil {
 		fields = append(fields, serp.FieldCreatedAt)
@@ -504,6 +598,8 @@ func (m *SERPMutation) Field(name string) (ent.Value, bool) {
 		return m.KeyWords()
 	case serp.FieldIsRead:
 		return m.IsRead()
+	case serp.FieldSqID:
+		return m.SqID()
 	case serp.FieldCreatedAt:
 		return m.CreatedAt()
 	}
@@ -527,6 +623,8 @@ func (m *SERPMutation) OldField(ctx context.Context, name string) (ent.Value, er
 		return m.OldKeyWords(ctx)
 	case serp.FieldIsRead:
 		return m.OldIsRead(ctx)
+	case serp.FieldSqID:
+		return m.OldSqID(ctx)
 	case serp.FieldCreatedAt:
 		return m.OldCreatedAt(ctx)
 	}
@@ -580,6 +678,13 @@ func (m *SERPMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetIsRead(v)
 		return nil
+	case serp.FieldSqID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSqID(v)
+		return nil
 	case serp.FieldCreatedAt:
 		v, ok := value.(time.Time)
 		if !ok {
@@ -594,13 +699,16 @@ func (m *SERPMutation) SetField(name string, value ent.Value) error {
 // AddedFields returns all numeric fields that were incremented/decremented during
 // this mutation.
 func (m *SERPMutation) AddedFields() []string {
-	return nil
+	var fields []string
+	return fields
 }
 
 // AddedField returns the numeric value that was incremented/decremented on a field
 // with the given name. The second boolean return value indicates that this field
 // was not set, or was not defined in the schema.
 func (m *SERPMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	}
 	return nil, false
 }
 
@@ -620,6 +728,9 @@ func (m *SERPMutation) ClearedFields() []string {
 	if m.FieldCleared(serp.FieldContactInfo) {
 		fields = append(fields, serp.FieldContactInfo)
 	}
+	if m.FieldCleared(serp.FieldSqID) {
+		fields = append(fields, serp.FieldSqID)
+	}
 	return fields
 }
 
@@ -636,6 +747,9 @@ func (m *SERPMutation) ClearField(name string) error {
 	switch name {
 	case serp.FieldContactInfo:
 		m.ClearContactInfo()
+		return nil
+	case serp.FieldSqID:
+		m.ClearSqID()
 		return nil
 	}
 	return fmt.Errorf("unknown SERP nullable field %s", name)
@@ -663,6 +777,9 @@ func (m *SERPMutation) ResetField(name string) error {
 	case serp.FieldIsRead:
 		m.ResetIsRead()
 		return nil
+	case serp.FieldSqID:
+		m.ResetSqID()
+		return nil
 	case serp.FieldCreatedAt:
 		m.ResetCreatedAt()
 		return nil
@@ -672,19 +789,28 @@ func (m *SERPMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *SERPMutation) AddedEdges() []string {
-	edges := make([]string, 0, 0)
+	edges := make([]string, 0, 1)
+	if m.search_query != nil {
+		edges = append(edges, serp.EdgeSearchQuery)
+	}
 	return edges
 }
 
 // AddedIDs returns all IDs (to other nodes) that were added for the given edge
 // name in this mutation.
 func (m *SERPMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case serp.EdgeSearchQuery:
+		if id := m.search_query; id != nil {
+			return []ent.Value{*id}
+		}
+	}
 	return nil
 }
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *SERPMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 0)
+	edges := make([]string, 0, 1)
 	return edges
 }
 
@@ -696,25 +822,42 @@ func (m *SERPMutation) RemovedIDs(name string) []ent.Value {
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *SERPMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 0)
+	edges := make([]string, 0, 1)
+	if m.clearedsearch_query {
+		edges = append(edges, serp.EdgeSearchQuery)
+	}
 	return edges
 }
 
 // EdgeCleared returns a boolean which indicates if the edge with the given name
 // was cleared in this mutation.
 func (m *SERPMutation) EdgeCleared(name string) bool {
+	switch name {
+	case serp.EdgeSearchQuery:
+		return m.clearedsearch_query
+	}
 	return false
 }
 
 // ClearEdge clears the value of the edge with the given name. It returns an error
 // if that edge is not defined in the schema.
 func (m *SERPMutation) ClearEdge(name string) error {
+	switch name {
+	case serp.EdgeSearchQuery:
+		m.ClearSearchQuery()
+		return nil
+	}
 	return fmt.Errorf("unknown SERP unique edge %s", name)
 }
 
 // ResetEdge resets all changes to the edge with the given name in this mutation.
 // It returns an error if the edge is not defined in the schema.
 func (m *SERPMutation) ResetEdge(name string) error {
+	switch name {
+	case serp.EdgeSearchQuery:
+		m.ResetSearchQuery()
+		return nil
+	}
 	return fmt.Errorf("unknown SERP edge %s", name)
 }
 
@@ -727,8 +870,12 @@ type SearchQueryMutation struct {
 	query         *string
 	location      *string
 	language      *string
+	is_canceled   *bool
 	created_at    *time.Time
 	clearedFields map[string]struct{}
+	serps         map[int]struct{}
+	removedserps  map[int]struct{}
+	clearedserps  bool
 	done          bool
 	oldValue      func(context.Context) (*SearchQuery, error)
 	predicates    []predicate.SearchQuery
@@ -940,6 +1087,42 @@ func (m *SearchQueryMutation) ResetLanguage() {
 	m.language = nil
 }
 
+// SetIsCanceled sets the "is_canceled" field.
+func (m *SearchQueryMutation) SetIsCanceled(b bool) {
+	m.is_canceled = &b
+}
+
+// IsCanceled returns the value of the "is_canceled" field in the mutation.
+func (m *SearchQueryMutation) IsCanceled() (r bool, exists bool) {
+	v := m.is_canceled
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldIsCanceled returns the old "is_canceled" field's value of the SearchQuery entity.
+// If the SearchQuery object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SearchQueryMutation) OldIsCanceled(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldIsCanceled is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldIsCanceled requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldIsCanceled: %w", err)
+	}
+	return oldValue.IsCanceled, nil
+}
+
+// ResetIsCanceled resets all changes to the "is_canceled" field.
+func (m *SearchQueryMutation) ResetIsCanceled() {
+	m.is_canceled = nil
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (m *SearchQueryMutation) SetCreatedAt(t time.Time) {
 	m.created_at = &t
@@ -976,6 +1159,60 @@ func (m *SearchQueryMutation) ResetCreatedAt() {
 	m.created_at = nil
 }
 
+// AddSerpIDs adds the "serps" edge to the SERP entity by ids.
+func (m *SearchQueryMutation) AddSerpIDs(ids ...int) {
+	if m.serps == nil {
+		m.serps = make(map[int]struct{})
+	}
+	for i := range ids {
+		m.serps[ids[i]] = struct{}{}
+	}
+}
+
+// ClearSerps clears the "serps" edge to the SERP entity.
+func (m *SearchQueryMutation) ClearSerps() {
+	m.clearedserps = true
+}
+
+// SerpsCleared reports if the "serps" edge to the SERP entity was cleared.
+func (m *SearchQueryMutation) SerpsCleared() bool {
+	return m.clearedserps
+}
+
+// RemoveSerpIDs removes the "serps" edge to the SERP entity by IDs.
+func (m *SearchQueryMutation) RemoveSerpIDs(ids ...int) {
+	if m.removedserps == nil {
+		m.removedserps = make(map[int]struct{})
+	}
+	for i := range ids {
+		delete(m.serps, ids[i])
+		m.removedserps[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedSerps returns the removed IDs of the "serps" edge to the SERP entity.
+func (m *SearchQueryMutation) RemovedSerpsIDs() (ids []int) {
+	for id := range m.removedserps {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// SerpsIDs returns the "serps" edge IDs in the mutation.
+func (m *SearchQueryMutation) SerpsIDs() (ids []int) {
+	for id := range m.serps {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetSerps resets all changes to the "serps" edge.
+func (m *SearchQueryMutation) ResetSerps() {
+	m.serps = nil
+	m.clearedserps = false
+	m.removedserps = nil
+}
+
 // Where appends a list predicates to the SearchQueryMutation builder.
 func (m *SearchQueryMutation) Where(ps ...predicate.SearchQuery) {
 	m.predicates = append(m.predicates, ps...)
@@ -1010,7 +1247,7 @@ func (m *SearchQueryMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *SearchQueryMutation) Fields() []string {
-	fields := make([]string, 0, 4)
+	fields := make([]string, 0, 5)
 	if m.query != nil {
 		fields = append(fields, searchquery.FieldQuery)
 	}
@@ -1019,6 +1256,9 @@ func (m *SearchQueryMutation) Fields() []string {
 	}
 	if m.language != nil {
 		fields = append(fields, searchquery.FieldLanguage)
+	}
+	if m.is_canceled != nil {
+		fields = append(fields, searchquery.FieldIsCanceled)
 	}
 	if m.created_at != nil {
 		fields = append(fields, searchquery.FieldCreatedAt)
@@ -1037,6 +1277,8 @@ func (m *SearchQueryMutation) Field(name string) (ent.Value, bool) {
 		return m.Location()
 	case searchquery.FieldLanguage:
 		return m.Language()
+	case searchquery.FieldIsCanceled:
+		return m.IsCanceled()
 	case searchquery.FieldCreatedAt:
 		return m.CreatedAt()
 	}
@@ -1054,6 +1296,8 @@ func (m *SearchQueryMutation) OldField(ctx context.Context, name string) (ent.Va
 		return m.OldLocation(ctx)
 	case searchquery.FieldLanguage:
 		return m.OldLanguage(ctx)
+	case searchquery.FieldIsCanceled:
+		return m.OldIsCanceled(ctx)
 	case searchquery.FieldCreatedAt:
 		return m.OldCreatedAt(ctx)
 	}
@@ -1085,6 +1329,13 @@ func (m *SearchQueryMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetLanguage(v)
+		return nil
+	case searchquery.FieldIsCanceled:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetIsCanceled(v)
 		return nil
 	case searchquery.FieldCreatedAt:
 		v, ok := value.(time.Time)
@@ -1151,6 +1402,9 @@ func (m *SearchQueryMutation) ResetField(name string) error {
 	case searchquery.FieldLanguage:
 		m.ResetLanguage()
 		return nil
+	case searchquery.FieldIsCanceled:
+		m.ResetIsCanceled()
+		return nil
 	case searchquery.FieldCreatedAt:
 		m.ResetCreatedAt()
 		return nil
@@ -1160,48 +1414,84 @@ func (m *SearchQueryMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *SearchQueryMutation) AddedEdges() []string {
-	edges := make([]string, 0, 0)
+	edges := make([]string, 0, 1)
+	if m.serps != nil {
+		edges = append(edges, searchquery.EdgeSerps)
+	}
 	return edges
 }
 
 // AddedIDs returns all IDs (to other nodes) that were added for the given edge
 // name in this mutation.
 func (m *SearchQueryMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case searchquery.EdgeSerps:
+		ids := make([]ent.Value, 0, len(m.serps))
+		for id := range m.serps {
+			ids = append(ids, id)
+		}
+		return ids
+	}
 	return nil
 }
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *SearchQueryMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 0)
+	edges := make([]string, 0, 1)
+	if m.removedserps != nil {
+		edges = append(edges, searchquery.EdgeSerps)
+	}
 	return edges
 }
 
 // RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
 // the given name in this mutation.
 func (m *SearchQueryMutation) RemovedIDs(name string) []ent.Value {
+	switch name {
+	case searchquery.EdgeSerps:
+		ids := make([]ent.Value, 0, len(m.removedserps))
+		for id := range m.removedserps {
+			ids = append(ids, id)
+		}
+		return ids
+	}
 	return nil
 }
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *SearchQueryMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 0)
+	edges := make([]string, 0, 1)
+	if m.clearedserps {
+		edges = append(edges, searchquery.EdgeSerps)
+	}
 	return edges
 }
 
 // EdgeCleared returns a boolean which indicates if the edge with the given name
 // was cleared in this mutation.
 func (m *SearchQueryMutation) EdgeCleared(name string) bool {
+	switch name {
+	case searchquery.EdgeSerps:
+		return m.clearedserps
+	}
 	return false
 }
 
 // ClearEdge clears the value of the edge with the given name. It returns an error
 // if that edge is not defined in the schema.
 func (m *SearchQueryMutation) ClearEdge(name string) error {
+	switch name {
+	}
 	return fmt.Errorf("unknown SearchQuery unique edge %s", name)
 }
 
 // ResetEdge resets all changes to the edge with the given name in this mutation.
 // It returns an error if the edge is not defined in the schema.
 func (m *SearchQueryMutation) ResetEdge(name string) error {
+	switch name {
+	case searchquery.EdgeSerps:
+		m.ResetSerps()
+		return nil
+	}
 	return fmt.Errorf("unknown SearchQuery edge %s", name)
 }

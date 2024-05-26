@@ -14,8 +14,11 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/sql"
+	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/karust/openserp/ent/searchquery"
 	"github.com/karust/openserp/ent/serp"
+
+	stdsql "database/sql"
 )
 
 // Client is the client that holds all ent builders.
@@ -314,6 +317,22 @@ func (c *SERPClient) GetX(ctx context.Context, id int) *SERP {
 	return obj
 }
 
+// QuerySearchQuery queries the search_query edge of a SERP.
+func (c *SERPClient) QuerySearchQuery(s *SERP) *SearchQueryQuery {
+	query := (&SearchQueryClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := s.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(serp.Table, serp.FieldID, id),
+			sqlgraph.To(searchquery.Table, searchquery.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, serp.SearchQueryTable, serp.SearchQueryColumn),
+		)
+		fromV = sqlgraph.Neighbors(s.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // Hooks returns the client hooks.
 func (c *SERPClient) Hooks() []Hook {
 	return c.hooks.SERP
@@ -447,6 +466,22 @@ func (c *SearchQueryClient) GetX(ctx context.Context, id int) *SearchQuery {
 	return obj
 }
 
+// QuerySerps queries the serps edge of a SearchQuery.
+func (c *SearchQueryClient) QuerySerps(sq *SearchQuery) *SERPQuery {
+	query := (&SERPClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := sq.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(searchquery.Table, searchquery.FieldID, id),
+			sqlgraph.To(serp.Table, serp.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, searchquery.SerpsTable, searchquery.SerpsColumn),
+		)
+		fromV = sqlgraph.Neighbors(sq.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // Hooks returns the client hooks.
 func (c *SearchQueryClient) Hooks() []Hook {
 	return c.hooks.SearchQuery
@@ -481,3 +516,27 @@ type (
 		SERP, SearchQuery []ent.Interceptor
 	}
 )
+
+// ExecContext allows calling the underlying ExecContext method of the driver if it is supported by it.
+// See, database/sql#DB.ExecContext for more information.
+func (c *config) ExecContext(ctx context.Context, query string, args ...any) (stdsql.Result, error) {
+	ex, ok := c.driver.(interface {
+		ExecContext(context.Context, string, ...any) (stdsql.Result, error)
+	})
+	if !ok {
+		return nil, fmt.Errorf("Driver.ExecContext is not supported")
+	}
+	return ex.ExecContext(ctx, query, args...)
+}
+
+// QueryContext allows calling the underlying QueryContext method of the driver if it is supported by it.
+// See, database/sql#DB.QueryContext for more information.
+func (c *config) QueryContext(ctx context.Context, query string, args ...any) (*stdsql.Rows, error) {
+	q, ok := c.driver.(interface {
+		QueryContext(context.Context, string, ...any) (*stdsql.Rows, error)
+	})
+	if !ok {
+		return nil, fmt.Errorf("Driver.QueryContext is not supported")
+	}
+	return q.QueryContext(ctx, query, args...)
+}

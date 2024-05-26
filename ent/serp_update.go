@@ -14,6 +14,7 @@ import (
 	"entgo.io/ent/schema/field"
 	"github.com/karust/openserp/core"
 	"github.com/karust/openserp/ent/predicate"
+	"github.com/karust/openserp/ent/searchquery"
 	"github.com/karust/openserp/ent/serp"
 )
 
@@ -118,6 +119,26 @@ func (su *SERPUpdate) SetNillableIsRead(b *bool) *SERPUpdate {
 	return su
 }
 
+// SetSqID sets the "sq_id" field.
+func (su *SERPUpdate) SetSqID(i int) *SERPUpdate {
+	su.mutation.SetSqID(i)
+	return su
+}
+
+// SetNillableSqID sets the "sq_id" field if the given value is not nil.
+func (su *SERPUpdate) SetNillableSqID(i *int) *SERPUpdate {
+	if i != nil {
+		su.SetSqID(*i)
+	}
+	return su
+}
+
+// ClearSqID clears the value of the "sq_id" field.
+func (su *SERPUpdate) ClearSqID() *SERPUpdate {
+	su.mutation.ClearSqID()
+	return su
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (su *SERPUpdate) SetCreatedAt(t time.Time) *SERPUpdate {
 	su.mutation.SetCreatedAt(t)
@@ -132,9 +153,34 @@ func (su *SERPUpdate) SetNillableCreatedAt(t *time.Time) *SERPUpdate {
 	return su
 }
 
+// SetSearchQueryID sets the "search_query" edge to the SearchQuery entity by ID.
+func (su *SERPUpdate) SetSearchQueryID(id int) *SERPUpdate {
+	su.mutation.SetSearchQueryID(id)
+	return su
+}
+
+// SetNillableSearchQueryID sets the "search_query" edge to the SearchQuery entity by ID if the given value is not nil.
+func (su *SERPUpdate) SetNillableSearchQueryID(id *int) *SERPUpdate {
+	if id != nil {
+		su = su.SetSearchQueryID(*id)
+	}
+	return su
+}
+
+// SetSearchQuery sets the "search_query" edge to the SearchQuery entity.
+func (su *SERPUpdate) SetSearchQuery(s *SearchQuery) *SERPUpdate {
+	return su.SetSearchQueryID(s.ID)
+}
+
 // Mutation returns the SERPMutation object of the builder.
 func (su *SERPUpdate) Mutation() *SERPMutation {
 	return su.mutation
+}
+
+// ClearSearchQuery clears the "search_query" edge to the SearchQuery entity.
+func (su *SERPUpdate) ClearSearchQuery() *SERPUpdate {
+	su.mutation.ClearSearchQuery()
+	return su
 }
 
 // Save executes the query and returns the number of nodes affected by the update operation.
@@ -219,6 +265,35 @@ func (su *SERPUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if value, ok := su.mutation.CreatedAt(); ok {
 		_spec.SetField(serp.FieldCreatedAt, field.TypeTime, value)
+	}
+	if su.mutation.SearchQueryCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   serp.SearchQueryTable,
+			Columns: []string{serp.SearchQueryColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(searchquery.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := su.mutation.SearchQueryIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   serp.SearchQueryTable,
+			Columns: []string{serp.SearchQueryColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(searchquery.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	if n, err = sqlgraph.UpdateNodes(ctx, su.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
@@ -328,6 +403,26 @@ func (suo *SERPUpdateOne) SetNillableIsRead(b *bool) *SERPUpdateOne {
 	return suo
 }
 
+// SetSqID sets the "sq_id" field.
+func (suo *SERPUpdateOne) SetSqID(i int) *SERPUpdateOne {
+	suo.mutation.SetSqID(i)
+	return suo
+}
+
+// SetNillableSqID sets the "sq_id" field if the given value is not nil.
+func (suo *SERPUpdateOne) SetNillableSqID(i *int) *SERPUpdateOne {
+	if i != nil {
+		suo.SetSqID(*i)
+	}
+	return suo
+}
+
+// ClearSqID clears the value of the "sq_id" field.
+func (suo *SERPUpdateOne) ClearSqID() *SERPUpdateOne {
+	suo.mutation.ClearSqID()
+	return suo
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (suo *SERPUpdateOne) SetCreatedAt(t time.Time) *SERPUpdateOne {
 	suo.mutation.SetCreatedAt(t)
@@ -342,9 +437,34 @@ func (suo *SERPUpdateOne) SetNillableCreatedAt(t *time.Time) *SERPUpdateOne {
 	return suo
 }
 
+// SetSearchQueryID sets the "search_query" edge to the SearchQuery entity by ID.
+func (suo *SERPUpdateOne) SetSearchQueryID(id int) *SERPUpdateOne {
+	suo.mutation.SetSearchQueryID(id)
+	return suo
+}
+
+// SetNillableSearchQueryID sets the "search_query" edge to the SearchQuery entity by ID if the given value is not nil.
+func (suo *SERPUpdateOne) SetNillableSearchQueryID(id *int) *SERPUpdateOne {
+	if id != nil {
+		suo = suo.SetSearchQueryID(*id)
+	}
+	return suo
+}
+
+// SetSearchQuery sets the "search_query" edge to the SearchQuery entity.
+func (suo *SERPUpdateOne) SetSearchQuery(s *SearchQuery) *SERPUpdateOne {
+	return suo.SetSearchQueryID(s.ID)
+}
+
 // Mutation returns the SERPMutation object of the builder.
 func (suo *SERPUpdateOne) Mutation() *SERPMutation {
 	return suo.mutation
+}
+
+// ClearSearchQuery clears the "search_query" edge to the SearchQuery entity.
+func (suo *SERPUpdateOne) ClearSearchQuery() *SERPUpdateOne {
+	suo.mutation.ClearSearchQuery()
+	return suo
 }
 
 // Where appends a list predicates to the SERPUpdate builder.
@@ -459,6 +579,35 @@ func (suo *SERPUpdateOne) sqlSave(ctx context.Context) (_node *SERP, err error) 
 	}
 	if value, ok := suo.mutation.CreatedAt(); ok {
 		_spec.SetField(serp.FieldCreatedAt, field.TypeTime, value)
+	}
+	if suo.mutation.SearchQueryCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   serp.SearchQueryTable,
+			Columns: []string{serp.SearchQueryColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(searchquery.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := suo.mutation.SearchQueryIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   serp.SearchQueryTable,
+			Columns: []string{serp.SearchQueryColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(searchquery.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	_node = &SERP{config: suo.config}
 	_spec.Assign = _node.assignValues

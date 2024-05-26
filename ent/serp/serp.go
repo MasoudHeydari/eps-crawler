@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"entgo.io/ent/dialect/sql"
+	"entgo.io/ent/dialect/sql/sqlgraph"
 )
 
 const (
@@ -25,10 +26,21 @@ const (
 	FieldKeyWords = "key_words"
 	// FieldIsRead holds the string denoting the is_read field in the database.
 	FieldIsRead = "is_read"
+	// FieldSqID holds the string denoting the sq_id field in the database.
+	FieldSqID = "sq_id"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
 	FieldCreatedAt = "created_at"
+	// EdgeSearchQuery holds the string denoting the search_query edge name in mutations.
+	EdgeSearchQuery = "search_query"
 	// Table holds the table name of the serp in the database.
 	Table = "serps"
+	// SearchQueryTable is the table that holds the search_query relation/edge.
+	SearchQueryTable = "serps"
+	// SearchQueryInverseTable is the table name for the SearchQuery entity.
+	// It exists in this package in order to avoid circular dependency with the "searchquery" package.
+	SearchQueryInverseTable = "search_queries"
+	// SearchQueryColumn is the table column denoting the search_query relation/edge.
+	SearchQueryColumn = "sq_id"
 )
 
 // Columns holds all SQL columns for serp fields.
@@ -40,6 +52,7 @@ var Columns = []string{
 	FieldContactInfo,
 	FieldKeyWords,
 	FieldIsRead,
+	FieldSqID,
 	FieldCreatedAt,
 }
 
@@ -92,7 +105,26 @@ func ByIsRead(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldIsRead, opts...).ToFunc()
 }
 
+// BySqID orders the results by the sq_id field.
+func BySqID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSqID, opts...).ToFunc()
+}
+
 // ByCreatedAt orders the results by the created_at field.
 func ByCreatedAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldCreatedAt, opts...).ToFunc()
+}
+
+// BySearchQueryField orders the results by search_query field.
+func BySearchQueryField(field string, opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newSearchQueryStep(), sql.OrderByField(field, opts...))
+	}
+}
+func newSearchQueryStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(SearchQueryInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.M2O, true, SearchQueryTable, SearchQueryColumn),
+	)
 }

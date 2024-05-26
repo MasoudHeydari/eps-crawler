@@ -7,5 +7,8 @@ services:
       - db/.env
     ports:
       - "5432:5432"
+    volumes:
+      - ./db/postgres-data:/var/lib/postgresql/data
+      - ./db/csv:/opt/eps
 
     

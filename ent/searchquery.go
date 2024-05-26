@@ -23,9 +23,32 @@ type SearchQuery struct {
 	Location string `json:"location,omitempty"`
 	// Language holds the value of the "language" field.
 	Language string `json:"language,omitempty"`
+	// IsCanceled holds the value of the "is_canceled" field.
+	IsCanceled bool `json:"is_canceled,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
-	CreatedAt    time.Time `json:"created_at,omitempty"`
+	CreatedAt time.Time `json:"created_at,omitempty"`
+	// Edges holds the relations/edges for other nodes in the graph.
+	// The values are being populated by the SearchQueryQuery when eager-loading is set.
+	Edges        SearchQueryEdges `json:"edges"`
 	selectValues sql.SelectValues
+}
+
+// SearchQueryEdges holds the relations/edges for other nodes in the graph.
+type SearchQueryEdges struct {
+	// Serps holds the value of the serps edge.
+	Serps []*SERP `json:"serps,omitempty"`
+	// loadedTypes holds the information for reporting if a
+	// type was loaded (or requested) in eager-loading or not.
+	loadedTypes [1]bool
+}
+
+// SerpsOrErr returns the Serps value or an error if the edge
+// was not loaded in eager-loading.
+func (e SearchQueryEdges) SerpsOrErr() ([]*SERP, error) {
+	if e.loadedTypes[0] {
+		return e.Serps, nil
+	}
+	return nil, &NotLoadedError{edge: "serps"}
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -33,6 +56,8 @@ func (*SearchQuery) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
+		case searchquery.FieldIsCanceled:
+			values[i] = new(sql.NullBool)
 		case searchquery.FieldID:
 			values[i] = new(sql.NullInt64)
 		case searchquery.FieldQuery, searchquery.FieldLocation, searchquery.FieldLanguage:
@@ -78,6 +103,12 @@ func (sq *SearchQuery) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				sq.Language = value.String
 			}
+		case searchquery.FieldIsCanceled:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field is_canceled", values[i])
+			} else if value.Valid {
+				sq.IsCanceled = value.Bool
+			}
 		case searchquery.FieldCreatedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
 				return fmt.Errorf("unexpected type %T for field created_at", values[i])
@@ -95,6 +126,11 @@ func (sq *SearchQuery) assignValues(columns []string, values []any) error {
 // This includes values selected through modifiers, order, etc.
 func (sq *SearchQuery) Value(name string) (ent.Value, error) {
 	return sq.selectValues.Get(name)
+}
+
+// QuerySerps queries the "serps" edge of the SearchQuery entity.
+func (sq *SearchQuery) QuerySerps() *SERPQuery {
+	return NewSearchQueryClient(sq.config).QuerySerps(sq)
 }
 
 // Update returns a builder for updating this SearchQuery.
@@ -128,6 +164,9 @@ func (sq *SearchQuery) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("language=")
 	builder.WriteString(sq.Language)
+	builder.WriteString(", ")
+	builder.WriteString("is_canceled=")
+	builder.WriteString(fmt.Sprintf("%v", sq.IsCanceled))
 	builder.WriteString(", ")
 	builder.WriteString("created_at=")
 	builder.WriteString(sq.CreatedAt.Format(time.ANSIC))

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"entgo.io/ent/dialect/sql"
+	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/karust/openserp/ent/predicate"
 )
 
@@ -67,6 +68,11 @@ func Location(v string) predicate.SearchQuery {
 // Language applies equality check predicate on the "language" field. It's identical to LanguageEQ.
 func Language(v string) predicate.SearchQuery {
 	return predicate.SearchQuery(sql.FieldEQ(FieldLanguage, v))
+}
+
+// IsCanceled applies equality check predicate on the "is_canceled" field. It's identical to IsCanceledEQ.
+func IsCanceled(v bool) predicate.SearchQuery {
+	return predicate.SearchQuery(sql.FieldEQ(FieldIsCanceled, v))
 }
 
 // CreatedAt applies equality check predicate on the "created_at" field. It's identical to CreatedAtEQ.
@@ -269,6 +275,16 @@ func LanguageContainsFold(v string) predicate.SearchQuery {
 	return predicate.SearchQuery(sql.FieldContainsFold(FieldLanguage, v))
 }
 
+// IsCanceledEQ applies the EQ predicate on the "is_canceled" field.
+func IsCanceledEQ(v bool) predicate.SearchQuery {
+	return predicate.SearchQuery(sql.FieldEQ(FieldIsCanceled, v))
+}
+
+// IsCanceledNEQ applies the NEQ predicate on the "is_canceled" field.
+func IsCanceledNEQ(v bool) predicate.SearchQuery {
+	return predicate.SearchQuery(sql.FieldNEQ(FieldIsCanceled, v))
+}
+
 // CreatedAtEQ applies the EQ predicate on the "created_at" field.
 func CreatedAtEQ(v time.Time) predicate.SearchQuery {
 	return predicate.SearchQuery(sql.FieldEQ(FieldCreatedAt, v))
@@ -307,6 +323,29 @@ func CreatedAtLT(v time.Time) predicate.SearchQuery {
 // CreatedAtLTE applies the LTE predicate on the "created_at" field.
 func CreatedAtLTE(v time.Time) predicate.SearchQuery {
 	return predicate.SearchQuery(sql.FieldLTE(FieldCreatedAt, v))
+}
+
+// HasSerps applies the HasEdge predicate on the "serps" edge.
+func HasSerps() predicate.SearchQuery {
+	return predicate.SearchQuery(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, SerpsTable, SerpsColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasSerpsWith applies the HasEdge predicate on the "serps" edge with a given conditions (other predicates).
+func HasSerpsWith(preds ...predicate.SERP) predicate.SearchQuery {
+	return predicate.SearchQuery(func(s *sql.Selector) {
+		step := newSerpsStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
 }
 
 // And groups predicates with the AND operator between them.

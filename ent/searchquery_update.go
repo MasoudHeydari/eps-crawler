@@ -13,6 +13,7 @@ import (
 	"entgo.io/ent/schema/field"
 	"github.com/karust/openserp/ent/predicate"
 	"github.com/karust/openserp/ent/searchquery"
+	"github.com/karust/openserp/ent/serp"
 )
 
 // SearchQueryUpdate is the builder for updating SearchQuery entities.
@@ -70,6 +71,20 @@ func (squ *SearchQueryUpdate) SetNillableLanguage(s *string) *SearchQueryUpdate 
 	return squ
 }
 
+// SetIsCanceled sets the "is_canceled" field.
+func (squ *SearchQueryUpdate) SetIsCanceled(b bool) *SearchQueryUpdate {
+	squ.mutation.SetIsCanceled(b)
+	return squ
+}
+
+// SetNillableIsCanceled sets the "is_canceled" field if the given value is not nil.
+func (squ *SearchQueryUpdate) SetNillableIsCanceled(b *bool) *SearchQueryUpdate {
+	if b != nil {
+		squ.SetIsCanceled(*b)
+	}
+	return squ
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (squ *SearchQueryUpdate) SetCreatedAt(t time.Time) *SearchQueryUpdate {
 	squ.mutation.SetCreatedAt(t)
@@ -84,9 +99,45 @@ func (squ *SearchQueryUpdate) SetNillableCreatedAt(t *time.Time) *SearchQueryUpd
 	return squ
 }
 
+// AddSerpIDs adds the "serps" edge to the SERP entity by IDs.
+func (squ *SearchQueryUpdate) AddSerpIDs(ids ...int) *SearchQueryUpdate {
+	squ.mutation.AddSerpIDs(ids...)
+	return squ
+}
+
+// AddSerps adds the "serps" edges to the SERP entity.
+func (squ *SearchQueryUpdate) AddSerps(s ...*SERP) *SearchQueryUpdate {
+	ids := make([]int, len(s))
+	for i := range s {
+		ids[i] = s[i].ID
+	}
+	return squ.AddSerpIDs(ids...)
+}
+
 // Mutation returns the SearchQueryMutation object of the builder.
 func (squ *SearchQueryUpdate) Mutation() *SearchQueryMutation {
 	return squ.mutation
+}
+
+// ClearSerps clears all "serps" edges to the SERP entity.
+func (squ *SearchQueryUpdate) ClearSerps() *SearchQueryUpdate {
+	squ.mutation.ClearSerps()
+	return squ
+}
+
+// RemoveSerpIDs removes the "serps" edge to SERP entities by IDs.
+func (squ *SearchQueryUpdate) RemoveSerpIDs(ids ...int) *SearchQueryUpdate {
+	squ.mutation.RemoveSerpIDs(ids...)
+	return squ
+}
+
+// RemoveSerps removes "serps" edges to SERP entities.
+func (squ *SearchQueryUpdate) RemoveSerps(s ...*SERP) *SearchQueryUpdate {
+	ids := make([]int, len(s))
+	for i := range s {
+		ids[i] = s[i].ID
+	}
+	return squ.RemoveSerpIDs(ids...)
 }
 
 // Save executes the query and returns the number of nodes affected by the update operation.
@@ -147,8 +198,56 @@ func (squ *SearchQueryUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if value, ok := squ.mutation.Language(); ok {
 		_spec.SetField(searchquery.FieldLanguage, field.TypeString, value)
 	}
+	if value, ok := squ.mutation.IsCanceled(); ok {
+		_spec.SetField(searchquery.FieldIsCanceled, field.TypeBool, value)
+	}
 	if value, ok := squ.mutation.CreatedAt(); ok {
 		_spec.SetField(searchquery.FieldCreatedAt, field.TypeTime, value)
+	}
+	if squ.mutation.SerpsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   searchquery.SerpsTable,
+			Columns: []string{searchquery.SerpsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(serp.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := squ.mutation.RemovedSerpsIDs(); len(nodes) > 0 && !squ.mutation.SerpsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   searchquery.SerpsTable,
+			Columns: []string{searchquery.SerpsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(serp.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := squ.mutation.SerpsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   searchquery.SerpsTable,
+			Columns: []string{searchquery.SerpsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(serp.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	if n, err = sqlgraph.UpdateNodes(ctx, squ.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
@@ -212,6 +311,20 @@ func (squo *SearchQueryUpdateOne) SetNillableLanguage(s *string) *SearchQueryUpd
 	return squo
 }
 
+// SetIsCanceled sets the "is_canceled" field.
+func (squo *SearchQueryUpdateOne) SetIsCanceled(b bool) *SearchQueryUpdateOne {
+	squo.mutation.SetIsCanceled(b)
+	return squo
+}
+
+// SetNillableIsCanceled sets the "is_canceled" field if the given value is not nil.
+func (squo *SearchQueryUpdateOne) SetNillableIsCanceled(b *bool) *SearchQueryUpdateOne {
+	if b != nil {
+		squo.SetIsCanceled(*b)
+	}
+	return squo
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (squo *SearchQueryUpdateOne) SetCreatedAt(t time.Time) *SearchQueryUpdateOne {
 	squo.mutation.SetCreatedAt(t)
@@ -226,9 +339,45 @@ func (squo *SearchQueryUpdateOne) SetNillableCreatedAt(t *time.Time) *SearchQuer
 	return squo
 }
 
+// AddSerpIDs adds the "serps" edge to the SERP entity by IDs.
+func (squo *SearchQueryUpdateOne) AddSerpIDs(ids ...int) *SearchQueryUpdateOne {
+	squo.mutation.AddSerpIDs(ids...)
+	return squo
+}
+
+// AddSerps adds the "serps" edges to the SERP entity.
+func (squo *SearchQueryUpdateOne) AddSerps(s ...*SERP) *SearchQueryUpdateOne {
+	ids := make([]int, len(s))
+	for i := range s {
+		ids[i] = s[i].ID
+	}
+	return squo.AddSerpIDs(ids...)
+}
+
 // Mutation returns the SearchQueryMutation object of the builder.
 func (squo *SearchQueryUpdateOne) Mutation() *SearchQueryMutation {
 	return squo.mutation
+}
+
+// ClearSerps clears all "serps" edges to the SERP entity.
+func (squo *SearchQueryUpdateOne) ClearSerps() *SearchQueryUpdateOne {
+	squo.mutation.ClearSerps()
+	return squo
+}
+
+// RemoveSerpIDs removes the "serps" edge to SERP entities by IDs.
+func (squo *SearchQueryUpdateOne) RemoveSerpIDs(ids ...int) *SearchQueryUpdateOne {
+	squo.mutation.RemoveSerpIDs(ids...)
+	return squo
+}
+
+// RemoveSerps removes "serps" edges to SERP entities.
+func (squo *SearchQueryUpdateOne) RemoveSerps(s ...*SERP) *SearchQueryUpdateOne {
+	ids := make([]int, len(s))
+	for i := range s {
+		ids[i] = s[i].ID
+	}
+	return squo.RemoveSerpIDs(ids...)
 }
 
 // Where appends a list predicates to the SearchQueryUpdate builder.
@@ -319,8 +468,56 @@ func (squo *SearchQueryUpdateOne) sqlSave(ctx context.Context) (_node *SearchQue
 	if value, ok := squo.mutation.Language(); ok {
 		_spec.SetField(searchquery.FieldLanguage, field.TypeString, value)
 	}
+	if value, ok := squo.mutation.IsCanceled(); ok {
+		_spec.SetField(searchquery.FieldIsCanceled, field.TypeBool, value)
+	}
 	if value, ok := squo.mutation.CreatedAt(); ok {
 		_spec.SetField(searchquery.FieldCreatedAt, field.TypeTime, value)
+	}
+	if squo.mutation.SerpsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   searchquery.SerpsTable,
+			Columns: []string{searchquery.SerpsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(serp.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := squo.mutation.RemovedSerpsIDs(); len(nodes) > 0 && !squo.mutation.SerpsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   searchquery.SerpsTable,
+			Columns: []string{searchquery.SerpsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(serp.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := squo.mutation.SerpsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   searchquery.SerpsTable,
+			Columns: []string{searchquery.SerpsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(serp.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	_node = &SearchQuery{config: squo.config}
 	_spec.Assign = _node.assignValues

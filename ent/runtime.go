@@ -29,7 +29,7 @@ func init() {
 	// serp.DefaultIsRead holds the default value on creation for the is_read field.
 	serp.DefaultIsRead = serpDescIsRead.Default.(bool)
 	// serpDescCreatedAt is the schema descriptor for created_at field.
-	serpDescCreatedAt := serpFields[6].Descriptor()
+	serpDescCreatedAt := serpFields[7].Descriptor()
 	// serp.DefaultCreatedAt holds the default value on creation for the created_at field.
 	serp.DefaultCreatedAt = serpDescCreatedAt.Default.(func() time.Time)
 	searchqueryFields := schema.SearchQuery{}.Fields()
@@ -38,8 +38,12 @@ func init() {
 	searchqueryDescQuery := searchqueryFields[0].Descriptor()
 	// searchquery.QueryValidator is a validator for the "query" field. It is called by the builders before save.
 	searchquery.QueryValidator = searchqueryDescQuery.Validators[0].(func(string) error)
+	// searchqueryDescIsCanceled is the schema descriptor for is_canceled field.
+	searchqueryDescIsCanceled := searchqueryFields[3].Descriptor()
+	// searchquery.DefaultIsCanceled holds the default value on creation for the is_canceled field.
+	searchquery.DefaultIsCanceled = searchqueryDescIsCanceled.Default.(bool)
 	// searchqueryDescCreatedAt is the schema descriptor for created_at field.
-	searchqueryDescCreatedAt := searchqueryFields[3].Descriptor()
+	searchqueryDescCreatedAt := searchqueryFields[4].Descriptor()
 	// searchquery.DefaultCreatedAt holds the default value on creation for the created_at field.
 	searchquery.DefaultCreatedAt = searchqueryDescCreatedAt.Default.(func() time.Time)
 }

@@ -5,6 +5,7 @@ import (
 	"entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/entsql"
 	"entgo.io/ent/schema"
+	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
 	"github.com/karust/openserp/core"
@@ -34,7 +35,18 @@ func (SERP) Fields() []ent.Field {
 		field.JSON("contact_info", core.ContactInfo{}).Optional(),
 		field.JSON("key_words", []string{}),
 		field.Bool("is_read").Default(false),
+		field.Int("sq_id").Optional(),
 		field.Time("created_at").SchemaType(TimeStampWithTZ).Default(time.Now),
+	}
+}
+
+// Edges of the SERP.
+func (SERP) Edges() []ent.Edge {
+	return []ent.Edge{
+		edge.From("search_query", SearchQuery.Type).
+			Ref("serps").
+			Unique().
+			Field("sq_id"),
 	}
 }
 

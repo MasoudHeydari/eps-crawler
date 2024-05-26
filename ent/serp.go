@@ -11,6 +11,7 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"github.com/karust/openserp/core"
+	"github.com/karust/openserp/ent/searchquery"
 	"github.com/karust/openserp/ent/serp"
 )
 
@@ -31,9 +32,34 @@ type SERP struct {
 	KeyWords []string `json:"key_words,omitempty"`
 	// IsRead holds the value of the "is_read" field.
 	IsRead bool `json:"is_read,omitempty"`
+	// SqID holds the value of the "sq_id" field.
+	SqID int `json:"sq_id,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
-	CreatedAt    time.Time `json:"created_at,omitempty"`
+	CreatedAt time.Time `json:"created_at,omitempty"`
+	// Edges holds the relations/edges for other nodes in the graph.
+	// The values are being populated by the SERPQuery when eager-loading is set.
+	Edges        SERPEdges `json:"edges"`
 	selectValues sql.SelectValues
+}
+
+// SERPEdges holds the relations/edges for other nodes in the graph.
+type SERPEdges struct {
+	// SearchQuery holds the value of the search_query edge.
+	SearchQuery *SearchQuery `json:"search_query,omitempty"`
+	// loadedTypes holds the information for reporting if a
+	// type was loaded (or requested) in eager-loading or not.
+	loadedTypes [1]bool
+}
+
+// SearchQueryOrErr returns the SearchQuery value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
+func (e SERPEdges) SearchQueryOrErr() (*SearchQuery, error) {
+	if e.SearchQuery != nil {
+		return e.SearchQuery, nil
+	} else if e.loadedTypes[0] {
+		return nil, &NotFoundError{label: searchquery.Label}
+	}
+	return nil, &NotLoadedError{edge: "search_query"}
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -45,7 +71,7 @@ func (*SERP) scanValues(columns []string) ([]any, error) {
 			values[i] = new([]byte)
 		case serp.FieldIsRead:
 			values[i] = new(sql.NullBool)
-		case serp.FieldID:
+		case serp.FieldID, serp.FieldSqID:
 			values[i] = new(sql.NullInt64)
 		case serp.FieldURL, serp.FieldTitle, serp.FieldDescription:
 			values[i] = new(sql.NullString)
@@ -112,6 +138,12 @@ func (s *SERP) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				s.IsRead = value.Bool
 			}
+		case serp.FieldSqID:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field sq_id", values[i])
+			} else if value.Valid {
+				s.SqID = int(value.Int64)
+			}
 		case serp.FieldCreatedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
 				return fmt.Errorf("unexpected type %T for field created_at", values[i])
@@ -129,6 +161,11 @@ func (s *SERP) assignValues(columns []string, values []any) error {
 // This includes values selected through modifiers, order, etc.
 func (s *SERP) Value(name string) (ent.Value, error) {
 	return s.selectValues.Get(name)
+}
+
+// QuerySearchQuery queries the "search_query" edge of the SERP entity.
+func (s *SERP) QuerySearchQuery() *SearchQueryQuery {
+	return NewSERPClient(s.config).QuerySearchQuery(s)
 }
 
 // Update returns a builder for updating this SERP.
@@ -171,6 +208,9 @@ func (s *SERP) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("is_read=")
 	builder.WriteString(fmt.Sprintf("%v", s.IsRead))
+	builder.WriteString(", ")
+	builder.WriteString("sq_id=")
+	builder.WriteString(fmt.Sprintf("%v", s.SqID))
 	builder.WriteString(", ")
 	builder.WriteString("created_at=")
 	builder.WriteString(s.CreatedAt.Format(time.ANSIC))

@@ -2,28 +2,40 @@ package google
 
 import (
 	"errors"
-	"regexp"
-	"strconv"
-	"strings"
-
+	"fmt"
 	"github.com/go-rod/rod"
+	"github.com/gocolly/colly"
 	"github.com/karust/openserp/core"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
+	"io"
+	"net/http"
+	"regexp"
+	"strconv"
+	"strings"
+	"time"
 )
 
 type Google struct {
 	core.Browser
 	core.SearchEngineOptions
-	findNumRgxp *regexp.Regexp
+	collector                                  *colly.Collector
+	findNumRgxp, findPhoneRgxp, findEmailRegex *regexp.Regexp
+	client                                     *http.Client
 }
 
 func New(browser core.Browser, opts core.SearchEngineOptions) *Google {
-	gogl := Google{Browser: browser}
+	gogl := Google{
+		Browser:   browser,
+		collector: colly.NewCollector(),
+		client:    &http.Client{Timeout: 5 * time.Second},
+	}
 	opts.Init()
 	gogl.SearchEngineOptions = opts
 
 	gogl.findNumRgxp = regexp.MustCompile("\\d")
+	gogl.findPhoneRgxp = regexp.MustCompile(`\b\(?\+?\d{1,2}[\s\-]?\)?\(?\d{3}\)?[\s\-\.]?\d{3}[\s\-\.]?\d{4}\b`) // regexp.MustCompile(`^(\+\d{1,2}\s)?\(?\d{3}\)?[\s.-]\d{3}[\s.-]\d{4}$`) //`\b\d{3}[-.]?\d{3}[-.]?\d{4}\b`)
+	gogl.findEmailRegex = regexp.MustCompile(`\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b`)
 	return &gogl
 }
 
@@ -148,7 +160,28 @@ func (gogl *Google) Search(query core.Query) ([]core.SearchResult, error) {
 			desc = descTag.MustText()
 		}
 
-		gR := core.SearchResult{Rank: i + 1, URL: linkText.String(), Title: title, Description: desc}
+		// extract contact-info
+		var contactInfo *core.ContactInfo
+		contactInfo, err = gogl.extractContactInfo(linkText.String())
+		if err != nil {
+			logrus.Errorf("Search: %v", err)
+		}
+
+		// extract key-words
+		var keyWords []string
+		keyWords, err = gogl.extractKeywords(linkText.String())
+		if err != nil {
+			logrus.Errorf("Search: %v", err)
+		}
+
+		gR := core.SearchResult{
+			Rank:        i + 1,
+			URL:         linkText.String(),
+			Title:       title,
+			ContactInfo: contactInfo,
+			KeyWords:    keyWords,
+			Description: desc,
+		}
 		searchResults = append(searchResults, gR)
 	}
 
@@ -160,4 +193,56 @@ func (gogl *Google) Search(query core.Query) ([]core.SearchResult, error) {
 	}
 
 	return searchResults, nil
+}
+
+func (gogl *Google) extractKeywords(path string) ([]string, error) {
+	r := make(map[string]struct{})
+	gogl.collector.OnHTML("h1, h2", func(e *colly.HTMLElement) {
+		r[e.Text] = struct{}{}
+	})
+	err := gogl.collector.Visit(path)
+	if err != nil {
+		return nil, fmt.Errorf("extractKeywords: %w", err)
+	}
+	keyWords := make([]string, 0, 5) // TODO: use proper capacity
+	for k := range r {
+		keyWords = append(keyWords, k)
+	}
+	return keyWords, nil
+}
+
+func (gogl *Google) extractContactInfo(path string) (*core.ContactInfo, error) {
+	phonesMap := make(map[string]struct{})
+	emailsMap := make(map[string]struct{})
+	resp, err := gogl.client.Get(path)
+	if err != nil {
+		return nil, fmt.Errorf("extractContactInfo.Get: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("extractContactInfo.ReadAll: %w", err)
+	}
+	phonesArray := gogl.findPhoneRgxp.FindAllString(string(body), -1)
+	emailsArray := gogl.findEmailRegex.FindAllString(string(body), -1)
+	for _, phone := range phonesArray {
+		phonesMap[phone] = struct{}{}
+	}
+
+	for _, email := range emailsArray {
+		emailsMap[email] = struct{}{}
+	}
+	phones := make([]string, 0, len(phonesMap))
+	emails := make([]string, 0, len(emailsMap))
+
+	for k := range emailsMap {
+		emails = append(emails, k)
+	}
+
+	for k := range phonesMap {
+		phones = append(phones, k)
+	}
+
+	return &core.ContactInfo{Phones: phones, Emails: emails}, nil
 }
