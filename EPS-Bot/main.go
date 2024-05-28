@@ -1,13 +1,17 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/sirupsen/logrus"
 	"io"
 	"log"
+	"mime"
 	"net/http"
+	"os"
+	"path/filepath"
 	"simple-telegram-bot/model"
 	"strconv"
 	"strings"
@@ -25,8 +29,12 @@ const (
 	Language       = "🌐 Language"
 	GetLastResult  = "📈 Get Last Results"
 	SetSearchQuery = "🔎 Set Your Search Query"
+	StartCrawler   = "Start the Crawler"
+	ExtractCSV     = "Extract CSV File"
+	CancelAJob     = "Cancel a Job"
 	APIToken       = "7053131148:AAG3NtM0ZJFxHEiGRQoUXeKlhDLqfVj5x78" //"6704135678:AAH2SGETz7tSKY5NsQ-vv2-zO7tj-XZaKAk"
 	TGBotPassword  = "1234"
+	Empty          = ""
 )
 
 var (
@@ -37,7 +45,11 @@ var (
 
 var (
 	helpKeys = tgbotapi.NewReplyKeyboard(
+		tgbotapi.NewKeyboardButtonRow(tgbotapi.NewKeyboardButton(SetSearchQuery)),
+		tgbotapi.NewKeyboardButtonRow(tgbotapi.NewKeyboardButton(StartCrawler)),
 		tgbotapi.NewKeyboardButtonRow(tgbotapi.NewKeyboardButton(GetLastResult)),
+		tgbotapi.NewKeyboardButtonRow(tgbotapi.NewKeyboardButton(ExtractCSV)),
+		tgbotapi.NewKeyboardButtonRow(tgbotapi.NewKeyboardButton(CancelAJob)),
 		tgbotapi.NewKeyboardButtonRow(
 			tgbotapi.NewKeyboardButton(Language),
 			tgbotapi.NewKeyboardButton(Location),
@@ -93,9 +105,8 @@ func main() {
 		// Check if we've gotten a message update.
 		if update.Message != nil {
 			messageText := update.Message.Text
-			messages := make([]tgbotapi.MessageConfig, 0)
+			messages := make([]tgbotapi.Chattable, 0)
 			msg := tgbotapi.NewMessage(update.Message.Chat.ID, update.Message.Text)
-			messages = append(messages, msg)
 			if mustProvidePassword {
 				if update.Message.Text == TGBotPassword {
 					mustProvidePassword = false
@@ -110,10 +121,24 @@ func main() {
 			case Start:
 			case Location:
 				sq.Location = messageText
+				lastInput = Empty
 			case Language:
 				sq.Language = messageText
+				lastInput = Empty
 			case SetSearchQuery:
 				sq.Query = messageText
+				lastInput = Empty
+			case StartCrawler:
+				m, err := StartTheCrawler(client, sq)
+				if err != nil {
+					if m == "" {
+						logrus.Info(err)
+						break
+					}
+				} else {
+					lastInput = Empty
+				}
+				msg.Text = m
 			case GetLastResult:
 				sqid, err := strconv.Atoi(messageText)
 				if err != nil {
@@ -130,7 +155,49 @@ func main() {
 					logrus.Info(err)
 					break
 				}
-				messages = append(messages, msgs...)
+				for _, m := range msgs {
+					messages = append(messages, m)
+				}
+				lastInput = Empty
+			case ExtractCSV:
+				sqid, err := strconv.Atoi(messageText)
+				if err != nil {
+					msg.Text = "Search query ID must be a number"
+					break
+				}
+				SQID = sqid
+				if SQID == 0 {
+					msg.Text = "Search query ID cannot be zero"
+					break
+				}
+				docMsg, err := GetCSVFile(client, update.Message.Chat.ID, SQID)
+				if err != nil {
+					logrus.Info(err)
+					break
+				}
+				messages = append(messages, docMsg)
+				msg.Text = Empty
+				lastInput = Empty
+			case CancelAJob:
+				sqid, err := strconv.Atoi(messageText)
+				if err != nil {
+					msg.Text = "Search query ID must be a number"
+					break
+				}
+				SQID = sqid
+				if SQID == 0 {
+					msg.Text = "Search query ID cannot be zero"
+					break
+				}
+				res, err := CancelASearchQuery(client, SQID)
+				if err != nil {
+					logrus.Info(err)
+					break
+				}
+				msg.Text = res
+				lastInput = Empty
+			case Empty:
+				msg.Text = "Sorry, I don't know what you mean!\nPlease select one of below buttons"
 			}
 
 			// Construct a new message from the given chat ID and containing
@@ -157,8 +224,15 @@ func main() {
 				msg.Text = "Please provide your search query to let the crawler starts it's work:"
 			case GetLastResult:
 				lastInput = GetLastResult
-				msg.Text = "Please provide your search query ID:"
+				msg.Text = "Please provide your search query ID to get the latest results:"
+			case ExtractCSV:
+				lastInput = ExtractCSV
+				msg.Text = "Please provide your search query ID to send export it:"
+			case CancelAJob:
+				lastInput = CancelAJob
+				msg.Text = "Please provide your search query ID to cancel it:"
 			}
+			messages = append(messages, msg)
 
 			// Send the message.
 			for _, m := range messages {
@@ -252,4 +326,119 @@ Phones: %s
 		tgMessages = append(tgMessages, msg)
 	}
 	return tgMessages, nil
+}
+
+func GetCSVFile(client *http.Client, msgChatID int64, sqID int) (*tgbotapi.DocumentConfig, error) {
+	urlPath := fmt.Sprintf("http://localhost:9999/api/v1/search/%d", sqID)
+	req, err := http.NewRequest(http.MethodGet, urlPath, nil)
+	if err != nil {
+		return nil, fmt.Errorf("GetCSVFile.NewRequest: %w", err)
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		//msg.Text = "We have problem to connect to our servers, Please try again later"
+		return nil, fmt.Errorf("GetCSVFile.Get: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("GetCSVFile.StatusCode: unintented status code: %d", resp.StatusCode)
+	}
+
+	contentDisposition := resp.Header.Get("Content-Disposition")
+	disposition, params, err := mime.ParseMediaType(contentDisposition)
+	fmt.Println(disposition)
+	filename := params["filename"] + "Masoud.csv"
+	fileAbsPath := filepath.Join(
+		"/home/dev.masoud/Desktop/dev/golang/German/EPS-Bot/storage",
+		filename,
+	) // TODO: use a proper path for inside of container -> /opt/eps-bot/storage
+
+	// Create a new file to store the downloaded data
+	file, err := os.Create(fileAbsPath)
+	if err != nil {
+		return nil, fmt.Errorf("GetCSVFile.CreateFile: %w", err)
+	}
+	defer file.Close()
+
+	// Copy the response body to the file
+	_, err = io.Copy(file, resp.Body)
+	if err != nil {
+		fmt.Println("Error writing to file:", err)
+		return nil, fmt.Errorf("GetCSVFile.CopyFile: %w", err)
+	}
+
+	fmt.Println("File downloaded and stored successfully!")
+	tgFile := tgbotapi.FilePath(fileAbsPath)
+	msg := tgbotapi.NewDocument(msgChatID, tgFile)
+	return &msg, nil
+}
+
+func CancelASearchQuery(client *http.Client, sqID int) (string, error) {
+	reqBody, err := json.Marshal(map[string]int{
+		"sq_id": sqID,
+	})
+	if err != nil {
+		return "", fmt.Errorf("CancelASearchQuery.jsonMarshal: %w", err)
+	}
+	req, err := http.NewRequest(http.MethodPatch, "http://localhost:9999/api/v1/search/", bytes.NewBuffer(reqBody))
+	if err != nil {
+		return "", fmt.Errorf("CancelASearchQuery.NewRequest: %w", err)
+	}
+	req.Header.Add("Content-Type", "application/json")
+	resp, err := client.Do(req)
+	if err != nil {
+		//msg.Text = "We have problem to connect to our servers, Please try again later"
+		return "", fmt.Errorf("CancelASearchQuery.Get: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNoContent {
+		return "", fmt.Errorf("CancelASearchQuery.StatusCode: unintented status code: %d", resp.StatusCode)
+	}
+	return fmt.Sprintf("Search query with %d canceled.", sqID), nil
+}
+
+func StartTheCrawler(client *http.Client, sq model.SearchQueryRequest) (string, error) {
+	if sq.Location == "" {
+		return "Location is missing", fmt.Errorf("bad search querey")
+	}
+	if sq.Language == "" {
+		return "Language is missing", fmt.Errorf("bad search querey")
+	}
+	if sq.Query == "" {
+		return "Query is missing", fmt.Errorf("bad search querey")
+	}
+	reqBody, err := json.Marshal(sq)
+	if err != nil {
+		return "", fmt.Errorf("StartTheCrawler.jsonMarshal: %w", err)
+	}
+	req, err := http.NewRequest(http.MethodPost, "http://localhost:9999/api/v1/search/", bytes.NewBuffer(reqBody))
+	if err != nil {
+		return "", fmt.Errorf("StartTheCrawler.NewRequest: %w", err)
+	}
+	req.Header.Add("Content-Type", "application/json")
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("StartTheCrawler.Get: %w", err)
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("StartTheCrawler.ReadAll: %w", err)
+	}
+	var s StartCrawlerResponse
+	err = json.Unmarshal(body, &s)
+	if err != nil {
+		return "", fmt.Errorf("StartTheCrawler.Unmarshal: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("StartTheCrawler.StatusCode: unintented status code: %d", resp.StatusCode)
+	}
+	return fmt.Sprintf("Crawler just started...\nYour Search Query ID is: %d", s.SQID), nil
+}
+
+type StartCrawlerResponse struct {
+	SQID int `param:"sq_id"` // SQID is Search Query ID
 }
