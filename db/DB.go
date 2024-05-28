@@ -78,9 +78,23 @@ func InsertBulk(ctx context.Context, db *ent.Client, results []core.SearchResult
 	return tx.Commit()
 }
 
-func GetAllResult(ctx context.Context, db *ent.Client) ([]SERP, error) {
+func GetSQID(ctx context.Context, db *ent.Client, loc, lang, searchQ string) (int, error) {
+	sq, err := db.SearchQuery.Query().
+		Where(
+			searchquery.Query(searchQ),
+			searchquery.Query(loc),
+			searchquery.Query(lang),
+		).
+		First(ctx)
+	if err != nil {
+		return -1, err
+	}
+	return sq.ID, nil
+}
+func GetAllResult(ctx context.Context, db *ent.Client, sqID int) ([]SERP, error) {
 	entSERPs, err := db.SERP.Query().
 		Where(
+			serp.SqID(sqID),
 			serp.IsRead(false),
 		).All(ctx)
 	if err != nil {
@@ -104,7 +118,7 @@ func GetAllResult(ctx context.Context, db *ent.Client) ([]SERP, error) {
 }
 
 func ExportCSV(ctx context.Context, db *ent.Client, sqID int) (csvAbsFilePath string, err error) {
-	tx, err := db.Debug().BeginTx(ctx, &sql.TxOptions{})
+	tx, err := db.BeginTx(ctx, &sql.TxOptions{})
 	if err != nil {
 		return "", fmt.Errorf("starting a transaction: %w", err)
 	}
@@ -178,10 +192,9 @@ func GetAllSearchQueries(ctx context.Context, db *ent.Client) ([]SearchQuery, er
 }
 
 func CancelSQ(ctx context.Context, db *ent.Client, sqID int) error {
-	rows, err := db.SearchQuery.UpdateOneID(sqID).
+	_, err := db.SearchQuery.UpdateOneID(sqID).
 		SetIsCanceled(true).
 		Save(ctx)
-	fmt.Println(rows)
 	return err
 }
 

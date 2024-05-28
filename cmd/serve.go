@@ -114,20 +114,27 @@ func (s *Server) Search(c echo.Context) error {
 		}()
 		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Minute)
 		defer cancel()
-		//client, err := db.NewDB()
-		//if err != nil {
-		//	logrus.Errorf("Failed to connect to DB, error: %v", err)
-		//	return
-		//}
 		search01(ctx, s.db, sq.Location, sq.Language, sq.Query)
 		fmt.Println("returned from goroutine")
 	}()
+	time.Sleep(time.Second * 2)
+	sqID, err := db.GetSQID(c.Request().Context(), s.db, sq.Location, sq.Language, sq.Query)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, err)
+	}
 
-	return c.JSON(http.StatusOK, "crawler started")
+	return c.JSON(http.StatusOK, echo.Map{"sq_id": sqID})
 }
 
 func (s *Server) GetSearchResults(c echo.Context) error {
-	serps, err := db.GetAllResult(context.Background(), s.db)
+	dto := new(GetAllSearchResults)
+	if err := c.Bind(dto); err != nil {
+		return c.JSON(http.StatusBadRequest, err)
+	}
+	if dto.SQID == 0 {
+		return c.JSON(http.StatusBadRequest, http.StatusText(http.StatusBadRequest))
+	}
+	serps, err := db.GetAllResult(context.Background(), s.db, dto.SQID)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, err)
 	}
